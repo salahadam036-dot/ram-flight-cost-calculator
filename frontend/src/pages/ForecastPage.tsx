@@ -9,6 +9,7 @@ import {
   Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
+  type DefaultLegendContentProps,
 } from "recharts";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
@@ -91,23 +92,21 @@ function findProfitSeries(series: ForecastSeries[]) {
 }
 
 // Legende custom : exclut les series internes de l'intervalle de confiance.
-function renderForecastLegend(props: {
-  payload?: Array<{ dataKey?: string; color?: string; value?: string | number }>;
-}) {
+function renderForecastLegend(props: DefaultLegendContentProps) {
   const items = (props.payload ?? []).filter(
-    (p) => p.dataKey !== "ci0" && p.dataKey !== "ci1"
+    (p) => String(p.dataKey) !== "ci0" && String(p.dataKey) !== "ci1"
   );
   if (items.length === 0) return null;
   return (
     <ul className="flex flex-wrap items-center justify-center gap-x-3 text-[11px] text-muted-foreground">
       {items.map((p) => (
-        <li key={p.dataKey ?? p.value} className="inline-flex items-center gap-1.5">
+        <li key={String(p.dataKey ?? p.value)} className="inline-flex items-center gap-1.5">
           <span
             aria-hidden
             className="inline-block h-0.5 w-4 rounded-full"
             style={{ background: p.color }}
           />
-          {p.value ?? p.dataKey}
+          {String(p.value ?? p.dataKey ?? "")}
         </li>
       ))}
     </ul>
