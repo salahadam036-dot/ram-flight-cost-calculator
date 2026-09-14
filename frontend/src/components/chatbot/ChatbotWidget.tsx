@@ -2,6 +2,7 @@ import { useState } from "react";
 import { HelpCircle, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import MarkdownMessage from "@/components/chatbot/MarkdownMessage";
 import { streamChat } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -93,13 +94,13 @@ export default function ChatbotWidget() {
               <div
                 key={i}
                 className={cn(
-                  "max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm",
+                  "max-w-[85%] rounded-lg px-3 py-2 text-sm",
                   m.role === "user"
-                    ? "ml-auto bg-primary text-primary-foreground"
+                    ? "ml-auto whitespace-pre-wrap bg-primary text-primary-foreground"
                     : "bg-secondary text-foreground",
                 )}
               >
-                {m.content}
+                {m.role === "user" ? m.content : <MarkdownMessage content={m.content} />}
               </div>
             ))}
             {loading && messages[messages.length - 1]?.content === "" && (
