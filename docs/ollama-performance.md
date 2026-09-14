@@ -49,6 +49,25 @@ sollicités à 100 %. Autrement dit, `llama.cpp` utilisait déjà tous les cœur
 disponibles — il n'y avait donc **aucun réglage de threads à optimiser**. Le
 chemin CPU était simplement saturé.
 
+### Mesures reproduites sur une machine GPU
+
+Le même profil a été refait sur un poste **Windows + Docker Desktop (WSL2)** avec
+une **RTX 4070 Laptop** (8 Go de VRAM), via la surcharge `docker-compose.gpu.yml` :
+
+| Mesure | Valeur |
+| --- | --- |
+| Processeur (`ollama ps`) | **`100% GPU`** |
+| `size_vram` (API `/api/ps`) | **2,55 Go** |
+| Génération (`eval`) | **80 à 86 jetons/s** |
+| Évaluation du prompt | **~17 000 à 22 000 jetons/s** |
+| Rechargement à froid du modèle | **2,66 s** |
+| Appel complet | **2,3 à 5,5 s** selon la longueur de la réponse |
+
+Autrement dit : environ **40 fois** plus rapide qu'en CPU, et la lecture du prompt
+devient négligeable (moins de 100 ms) là où elle coûtait près de 4 s sur CPU. Le
+seul poste de temps restant est la génération, proportionnelle à la longueur de
+la réponse.
+
 ## 3. Cause racine
 
 **Docker Desktop sur macOS n'a pas d'accès GPU.** Les conteneurs tournent dans
@@ -76,17 +95,31 @@ Trois réglages, tous surchargeables par variable d'environnement :
 | Variable | Défaut | Rôle |
 | --- | --- | --- |
 | `OLLAMA_KEEP_ALIVE` | `30m` | Durée pendant laquelle le modèle reste chargé en mémoire |
-| `OLLAMA_NUM_PREDICT` | `256` | Plafond du nombre de jetons générés par réponse |
+| `OLLAMA_NUM_PREDICT` | `-1` | Longueur maximale de la réponse (**-1 = pas de plafond**) |
 | `OLLAMA_TIMEOUT` | `180` | Délai maximal d'attente (en secondes) |
 
 Le défaut Ollama pour `keep_alive` est de **5 minutes** : passé ce délai, le
 modèle est déchargé et la question suivante paie un rechargement complet depuis
 le disque (mesuré : 5,9 s).
 
+Le plafond `num_predict` avait été introduit pour borner le pire cas. En pratique
+il **tronquait les réponses en plein milieu** : sur les mesures de cette machine,
+3 questions sur 4 s'arrêtaient sur `done_reason=length` à exactement 256 jetons,
+parfois au milieu d'un mot (« … pour calculer les co »). Comme le flux est
+désormais diffusé au fur et à mesure (voir section 10), l'attente ressentie ne
+dépend plus de cette limite : elle est donc passée à `-1` (aucune limite), la
+génération s'arrêtant d'elle-même sur le jeton de fin du modèle. `OLLAMA_TIMEOUT`
+reste le garde-fou contre une génération qui partirait en boucle.
+
 ### `backend/app/routers/chatbot.py`
 
-- Le `keep_alive` et le plafond `num_predict` sont transmis à Ollama à chaque
-  requête.
+- Le `keep_alive` et la longueur maximale `num_predict` sont transmis à Ollama à
+  chaque requête.
+- **`POST /api/chatbot/stream`** : route ajoutée qui diffuse la réponse au fur et
+  à mesure (Server-Sent Events), en relayant le flux NDJSON d'Ollama. Le widget de
+  chat l'utilise : le premier mot s'affiche en ~200 ms au lieu d'attendre la fin
+  complète de la génération. La route `POST /api/chatbot` (réponse en un bloc)
+  reste disponible pour les scripts et `curl`.
 - Le délai d'attente n'est plus codé en dur (`timeout=300`) : il vient de
   `OLLAMA_TIMEOUT`.
 - Les erreurs sont mieux distinguées : **503** si Ollama n'est pas démarré,
@@ -253,7 +286,7 @@ cette variable.
 | `OLLAMA_URL` | `http://ollama:11434/api/chat` | backend | URL de l'API Ollama |
 | `OLLAMA_MODEL` | `llama3.2` | backend | Modèle utilisé |
 | `OLLAMA_KEEP_ALIVE` | `30m` | backend + ollama | Maintien du modèle en mémoire |
-| `OLLAMA_NUM_PREDICT` | `256` | backend | Plafond de jetons par réponse |
+| `OLLAMA_NUM_PREDICT` | `-1` | backend | Longueur maximale de la réponse (`-1` = pas de plafond) |
 | `OLLAMA_TIMEOUT` | `180` | backend | Délai maximal (secondes) |
 | `OLLAMA_NUM_PARALLEL` | `1` | ollama | Requêtes simultanées |
 | `OLLAMA_MAX_LOADED_MODELS` | `1` | ollama | Modèles gardés en mémoire |
@@ -295,6 +328,14 @@ curl -sS -w '\n--- %{time_total}s\n' http://localhost:8000/api/chatbot \
 docker stats --no-stream ram-ollama
 ```
 
+Tout ceci — et davantage : câblage du frontend, CORS, coûts fixes, démarrage à
+froid, requêtes simultanées, latence du premier jeton en flux — est automatisé
+dans un script :
+
+```bash
+python3 scripts/profile_chatbot.py
+```
+
 Le jeton du point 4 s'obtient via :
 
 ```bash
@@ -303,13 +344,23 @@ curl -s http://localhost:8000/api/auth/login \
   -d '{"username":"admin","password":"admin123"}'
 ```
 
-## 10. Piste d'amélioration restante
+## 10. Diffusion en flux (implémentée)
 
-Les réponses sont aujourd'hui renvoyées **en un bloc** (`stream: false`) : le
-client attend la fin complète de la génération avant d'afficher quoi que ce
-soit. Passer à `stream: true` avec un flux SSE afficherait le premier jeton en
-quelques centaines de millisecondes au lieu de plusieurs secondes.
+Les réponses étaient auparavant renvoyées **en un bloc** (`stream: false`) : le
+client attendait la fin complète de la génération avant d'afficher quoi que ce
+soit. Le widget de chat utilise désormais `POST /api/chatbot/stream`, qui relaie le
+flux NDJSON d'Ollama vers le navigateur en Server-Sent Events : le texte s'affiche
+mot à mot.
 
-Ce point devient secondaire une fois le GPU actif (réponses en moins d'une
-seconde), mais il reste la meilleure protection contre la latence perçue si
-l'assistant doit un jour tourner sans GPU.
+Mesures sur cette machine (RTX 4070 Laptop), question « Comment calculer le coût
+d'un vol ? » :
+
+| | Avant (bloc) | Après (flux) |
+| --- | --- | --- |
+| Premier texte affiché | ~4 300 ms | **~206 ms** |
+| Réponse complète | ~4 300 ms | ~4 340 ms |
+
+Le temps total est identique, mais l'attente perçue passe de plusieurs secondes
+d'écran vide à un affichage quasi immédiat. C'est aussi ce qui permet de supprimer
+le plafond `num_predict` sans dégrader l'expérience : une réponse longue n'est
+plus pénalisante puisqu'elle se remplit progressivement.

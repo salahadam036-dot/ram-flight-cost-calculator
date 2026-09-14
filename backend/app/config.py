@@ -43,9 +43,12 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 # suivante paie un rechargement complet depuis le disque (~5 s mesure).
 OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 
-# Plafond du nombre de tokens generes par reponse. Sans plafond, une reponse qui
-# part en boucle immobilise l'utilisateur plusieurs minutes.
-OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "256"))
+# Longueur maximale de la reponse. -1 = pas de plafond : la generation s'arrete
+# d'elle-meme sur le jeton de fin (EOS), ce qui evite les reponses tronquees en
+# plein milieu. Comme le flux est diffuse au fur et a mesure (voir /chatbot/stream),
+# l'attente ressentie ne depend plus de ce plafond ; OLLAMA_TIMEOUT reste le
+# garde-fou contre une generation qui partirait en boucle.
+OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "-1"))
 
 # Delai maximal d'attente de la reponse Ollama, en secondes. A garder au-dessus du
 # pire cas : prompt + (num_predict / vitesse de generation).

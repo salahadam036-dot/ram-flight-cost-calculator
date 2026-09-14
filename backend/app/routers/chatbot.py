@@ -3,6 +3,7 @@ import urllib.error
 import urllib.request
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.config import (
     OLLAMA_KEEP_ALIVE,
@@ -39,34 +40,109 @@ Connexion par defaut : admin / admin123
 Si la question ne concerne pas l'application, redirige poliment vers le sujet."""
 
 
-@router.post("", response_model=ChatbotOut)
-def chat(body: ChatbotRequest, _=Depends(get_current_user)):
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages += [{"role": m.role, "content": m.content} for m in body.messages]
-    payload = json.dumps(
+def _conversation(messages) -> list:
+    """Ajoute le prompt systeme a l'historique envoye par le frontend."""
+    return [{"role": "system", "content": SYSTEM_PROMPT}] + [
+        {"role": m.role, "content": m.content} for m in messages
+    ]
+
+
+def _build_payload(messages, stream: bool) -> bytes:
+    """Charge utile Ollama, commune au mode bloc et au mode flux."""
+    return json.dumps(
         {
             "model": OLLAMA_MODEL,
-            "stream": False,
+            "stream": stream,
             "messages": messages,
             # Garde le modele en memoire entre deux questions (defaut : 5 min).
             "keep_alive": OLLAMA_KEEP_ALIVE,
-            # Borne la longueur de la reponse : garantit un pire cas connu.
+            # -1 = pas de plafond : la reponse se termine sur EOS.
             "options": {"num_predict": OLLAMA_NUM_PREDICT},
         }
     ).encode("utf-8")
 
+
+def _open_ollama(payload: bytes):
+    """Ouvre la connexion vers Ollama, en traduisant les pannes en erreurs HTTP.
+
+    La connexion est ouverte avant de renvoyer la reponse HTTP : une panne
+    produit donc un vrai code 503/504, et non un flux deja commence.
+    """
     req = urllib.request.Request(
         OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"}, method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=OLLAMA_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return {"content": data["message"]["content"]}
+        return urllib.request.urlopen(req, timeout=OLLAMA_TIMEOUT)
     except urllib.error.URLError as e:
         if isinstance(e.reason, TimeoutError):
             raise HTTPException(504, "Le modele n'a pas repondu dans le delai imparti.")
         raise HTTPException(503, "Ollama n'est pas demarre. Lancez : ollama serve")
     except TimeoutError:
         raise HTTPException(504, "Le modele n'a pas repondu dans le delai imparti.")
+
+
+def _sse_event(payload: dict) -> str:
+    """Formate un evenement Server-Sent Events."""
+    return "data: %s\n\n" % json.dumps(payload)
+
+
+def _sse_stream(resp):
+    """Traduit le NDJSON d'Ollama en evenements SSE pour le navigateur."""
+    try:
+        with resp:
+            for raw in resp:
+                line = raw.decode("utf-8").strip()
+                if not line:
+                    continue
+                try:
+                    chunk = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if chunk.get("error"):
+                    yield _sse_event({"error": chunk["error"]})
+                    break
+                piece = chunk.get("message", {}).get("content", "")
+                if piece:
+                    yield _sse_event({"token": piece})
+                if chunk.get("done"):
+                    yield _sse_event(
+                        {
+                            "done": True,
+                            "done_reason": chunk.get("done_reason", ""),
+                            "eval_count": chunk.get("eval_count", 0),
+                            "eval_duration": chunk.get("eval_duration", 0),
+                        }
+                    )
+                    break
+    except Exception as e:
+        # Flux interrompu : Ollama arrete, delai depasse, navigateur parti...
+        yield _sse_event({"error": str(e)})
+
+    yield "data: [DONE]\n\n"
+
+
+@router.post("", response_model=ChatbotOut)
+def chat(body: ChatbotRequest, _=Depends(get_current_user)):
+    """Reponse complete en un bloc (scripts, curl, clients non SSE)."""
+    resp = _open_ollama(_build_payload(_conversation(body.messages), stream=False))
+    try:
+        with resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return {"content": data["message"]["content"]}
     except Exception as e:
         raise HTTPException(500, f"Erreur : {e}")
+
+
+@router.post("/stream")
+def chat_stream(body: ChatbotRequest, _=Depends(get_current_user)):
+    """Diffuse la reponse au fur et a mesure (Server-Sent Events).
+
+    Le premier jeton arrive en quelques dizaines de millisecondes au lieu
+    d'attendre la fin complete de la generation.
+    """
+    resp = _open_ollama(_build_payload(_conversation(body.messages), stream=True))
+    return StreamingResponse(
+        _sse_stream(resp),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

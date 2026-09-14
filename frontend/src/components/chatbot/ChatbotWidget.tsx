@@ -2,7 +2,7 @@ import { useState } from "react";
 import { HelpCircle, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiPost } from "@/lib/api";
+import { streamChat } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface Msg {
@@ -20,19 +20,37 @@ export default function ChatbotWidget() {
     const text = input.trim();
     if (!text || loading) return;
     const next: Msg[] = [...messages, { role: "user", content: text }];
-    setMessages(next);
+    // Bulle vide affichee tout de suite : elle se remplit au fil du flux.
+    setMessages([...next, { role: "assistant", content: "" }]);
     setInput("");
     setLoading(true);
     try {
-      const res = await apiPost<{ content: string }>("/chatbot", { messages: next });
-      setMessages([...next, { role: "assistant", content: res.content }]);
+      await streamChat(next, {
+        onToken: (token) =>
+          setMessages((current) => {
+            const updated = [...current];
+            const last = updated[updated.length - 1];
+            if (!last) return current;
+            updated[updated.length - 1] = { ...last, content: last.content + token };
+            return updated;
+          }),
+      });
     } catch (e) {
       const err = e as Error;
       const friendly =
         err.message.toLowerCase().includes("ollama") || err.message.toLowerCase().includes("pas demarre")
           ? "Le service d'assistant n'est pas disponible (Ollama). Vérifiez que le conteneur ollama tourne."
           : err.message;
-      setMessages([...next, { role: "assistant", content: "Erreur : " + friendly }]);
+      // On garde la reponse partielle si des jetons sont deja arrives.
+      setMessages((current) => {
+        const updated = [...current];
+        const last = updated[updated.length - 1];
+        if (last && last.role === "assistant" && last.content === "") {
+          updated[updated.length - 1] = { role: "assistant", content: "Erreur : " + friendly };
+          return updated;
+        }
+        return [...updated, { role: "assistant", content: "Erreur : " + friendly }];
+      });
     } finally {
       setLoading(false);
     }
@@ -84,7 +102,7 @@ export default function ChatbotWidget() {
                 {m.content}
               </div>
             ))}
-            {loading && (
+            {loading && messages[messages.length - 1]?.content === "" && (
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <span className="flex gap-0.5">
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: "0ms" }} />
