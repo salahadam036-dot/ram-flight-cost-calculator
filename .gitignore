@@ -13,6 +13,10 @@ node_modules/
 # Cache de build Vite
 frontend/.vite/
 
+# Sortie de build du frontend (`npm run build`). Desormais non versionnee : le
+# bundle commite ne suivait plus le code source. Regenerable a tout moment.
+frontend/dist/
+
 # Export d'image Docker (plusieurs Go)
 *.tar
 
