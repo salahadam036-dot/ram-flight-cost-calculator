@@ -26,6 +26,10 @@ desktop/release/
 desktop/*.zip
 desktop/*.tar
 
+# Surcharge Compose specifique a la machine (Ollama distant, reglages locaux).
+# Ne doit pas etre versionnee : voir docker-compose.override.yml.
+docker-compose.override.yml
+
 # OS / editor
 .DS_Store
 *.log

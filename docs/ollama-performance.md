@@ -258,6 +258,15 @@ cette variable.
 | `OLLAMA_NUM_PARALLEL` | `1` | ollama | Requêtes simultanées |
 | `OLLAMA_MAX_LOADED_MODELS` | `1` | ollama | Modèles gardés en mémoire |
 
+Ces variables se surchargent à deux endroits, selon leur portée :
+
+- **`.env`** — configuration portable, versionnée ; convient aux réglages communs
+  à toutes les machines (durée des jetons, modèle, etc.).
+- **`docker-compose.override.yml`** — réglages propres à *une* machine (par
+  exemple l'URL d'un Ollama distant). Ce fichier est **exclu du dépôt**
+  (`.gitignore`) et chargé automatiquement par `docker compose` : inutile de le
+  passer en `-f`.
+
 ## 8. Dépannage
 
 | Symptôme | Cause probable | Solution |
@@ -300,7 +309,76 @@ curl -s http://localhost:8000/api/auth/login \
   -d '{"username":"admin","password":"admin123"}'
 ```
 
-## 10. Piste d'amélioration restante
+## 10. Utiliser un Ollama distant (réseau local)
+
+Plutôt que d'exécuter le modèle sur la machine qui fait tourner l'application, on
+peut le déléguer à un autre poste du réseau — par exemple un portable équipé d'un
+GPU. Sur le poste de référence, la réponse à un simple « bonjour » est passée de
+**6,99 s à 0,70 s**.
+
+### 10.1 Prérequis côté machine distante
+
+Ollama doit écouter sur toutes les interfaces, et pas seulement sur `localhost` :
+
+```bash
+OLLAMA_HOST=0.0.0.0:11434 ollama serve
+```
+
+Vérifier depuis l'autre machine (remplacer l'adresse par celle du poste GPU) :
+
+```bash
+curl -s http://192.168.11.107:11434/api/version
+```
+
+### 10.2 Blocage macOS « Réseau local »
+
+Sur macOS 15 et versions ultérieures, les conteneurs Docker ne peuvent pas
+joindre les adresses `192.168.x.x`, alors qu'ils joignent Internet et que l'hôte
+y accède sans problème. Mesures relevées sur le poste de référence :
+
+| Depuis | Vers | Résultat |
+| --- | --- | --- |
+| Hôte | `192.168.11.107:11434` | ✅ OK |
+| Conteneur | `1.1.1.1:443` | ✅ OK |
+| Conteneur | `192.168.11.107` / `.1` / `.103` | ❌ timeout |
+| Conteneur (`--network host`) | `192.168.x.x` | ❌ No route to host |
+
+Autoriser « Docker Desktop » dans *Réglages Système > Confidentialité et sécurité
+\> Réseau local* ne suffit pas toujours : le trafic vers le LAN est émis par un
+helper privilégié (`com.docker.vmnetd`, `com.docker.virtualization`), et non par
+l'application elle-même. **Quitter complètement Docker Desktop** (menu baleine >
+*Quit*), puis le relancer : l'autorisation n'est prise en compte qu'au démarrage.
+
+### 10.3 Pont TCP (contournement)
+
+Si le blocage persiste, `scripts/ollama-bridge.py` fait le relais depuis l'hôte,
+qui lui accède au réseau local :
+
+```bash
+nohup python3 scripts/ollama-bridge.py > /tmp/ollama-bridge.log 2>&1 &
+```
+
+Puis, dans `docker-compose.override.yml` (fichier local **non versionné**, voir la
+section 7) :
+
+```yaml
+services:
+  backend:
+    environment:
+      OLLAMA_URL: http://host.docker.internal:11435/api/chat
+```
+
+Le surcoût du pont est négligeable, mesuré à **79 ms** :
+
+| Chemin | Durée | Génération |
+| --- | --- | --- |
+| Direct hôte → GPU | 3,59 s | 59,3 jetons/s |
+| Via le pont | 3,67 s | 57,4 jetons/s |
+
+> ℹ️ Sur le poste GPU lui-même, ce pont est inutile : Ollama y tourne en local, et
+> le `docker-compose.override.yml` ne doit pas être présent.
+
+## 11. Piste d'amélioration restante
 
 Les réponses sont aujourd'hui renvoyées **en un bloc** (`stream: false`) : le
 client attend la fin complète de la génération avant d'afficher quoi que ce
