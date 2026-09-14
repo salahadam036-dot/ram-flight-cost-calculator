@@ -6,29 +6,27 @@ venv/
 backend/data/*.db
 backend/data/backups/
 
-# Node
+# Dependances Node : regenerables avec `npm install`, et trop volumineuses pour
+# un depot Git (730 Mo a elles deux).
 node_modules/
-frontend/dist/
+
+# Cache de build Vite
 frontend/.vite/
+
+# Export d'image Docker (plusieurs Go)
+*.tar
+
+# GitHub refuse tout fichier depassant 100 Mo (limite stricte, non contournable) :
+#   desktop/node_modules/electron/dist/electron                    178 Mo
+#   desktop/release/RAM Flight Cost Calculator (win64)/...exe       180 Mo
+# Ces dossiers sont donc exclus. Les binaires se regenerent avec
+# `npm run dist:win` (Windows) ou `npm run dist:linux` (Linux).
+# Pour les versionner malgre tout, il faudrait passer par Git LFS.
 desktop/release/
 desktop/*.zip
 desktop/*.tar
-dist-exe/
-
-# Docker image export
-*.tar
-
-# Secrets (ne jamais versionner de secrets reels).
-.env
-.env.*
-!.env.example
-# URL de build de l'application desktop (non secret, requis pour la build).
-!frontend/.env.production
 
 # OS / editor
 .DS_Store
 *.log
 *:Zone.Identifier
-
-# Fichiers de travail temporaires (brouillons, notes, exports intermediaires).
-.tmp_*
