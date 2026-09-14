@@ -43,12 +43,26 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 # suivante paie un rechargement complet depuis le disque (~5 s mesure).
 OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 
-# Longueur maximale de la reponse. -1 = pas de plafond : la generation s'arrete
-# d'elle-meme sur le jeton de fin (EOS), ce qui evite les reponses tronquees en
-# plein milieu. Comme le flux est diffuse au fur et a mesure (voir /chatbot/stream),
-# l'attente ressentie ne depend plus de ce plafond ; OLLAMA_TIMEOUT reste le
-# garde-fou contre une generation qui partirait en boucle.
-OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "-1"))
+# Nombre maximal de jetons generes par reponse. La generation s'arrete de toute
+# facon d'elle-meme sur le jeton de fin du modele ; cette borne n'est qu'un
+# garde-fou contre une reponse qui partirait en boucle.
+#
+# Elle joue un second role, moins evident : Ollama reserve dans la fenetre de
+# contexte autant de place que num_predict pour la generation. Avec -1 (aucune
+# limite), il reserve la moitie de la fenetre et tronque le prompt en consequence
+# (constate : "truncating input prompt", limit=4098 pour un prompt de 8 951
+# jetons). Une valeur finie laisse donc au contraire toute la place au contexte
+# de l'application. 1024 couvre largement les reponses observees (150 a 420
+# jetons, mesurees apres passage au streaming).
+OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "1024"))
+
+# Taille de la fenetre de contexte (en jetons) allouee au modele. Doit couvrir le
+# prompt systeme + l'etat de l'application (voir app/services/app_context.py) +
+# l'historique de la conversation. L'augmenter consomme de la memoire : le cache
+# KV croit avec cette valeur. La baisser fait perdre les messages les plus anciens.
+# Ollama reserve par ailleurs la moitie de cette fenetre a la generation quand
+# num_predict est sans plafond : seuls ~8 000 jetons restent donc pour le prompt.
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "16384"))
 
 # Delai maximal d'attente de la reponse Ollama, en secondes. A garder au-dessus du
 # pire cas : prompt + (num_predict / vitesse de generation).

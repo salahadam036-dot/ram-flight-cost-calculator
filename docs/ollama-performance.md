@@ -95,7 +95,7 @@ Trois réglages, tous surchargeables par variable d'environnement :
 | Variable | Défaut | Rôle |
 | --- | --- | --- |
 | `OLLAMA_KEEP_ALIVE` | `30m` | Durée pendant laquelle le modèle reste chargé en mémoire |
-| `OLLAMA_NUM_PREDICT` | `-1` | Longueur maximale de la réponse (**-1 = pas de plafond**) |
+| `OLLAMA_NUM_PREDICT` | `1024` | Longueur maximale de la réponse ; détermine aussi la place réservée à la génération dans la fenêtre de contexte |
 | `OLLAMA_TIMEOUT` | `180` | Délai maximal d'attente (en secondes) |
 
 Le défaut Ollama pour `keep_alive` est de **5 minutes** : passé ce délai, le
@@ -107,9 +107,16 @@ il **tronquait les réponses en plein milieu** : sur les mesures de cette machin
 3 questions sur 4 s'arrêtaient sur `done_reason=length` à exactement 256 jetons,
 parfois au milieu d'un mot (« … pour calculer les co »). Comme le flux est
 désormais diffusé au fur et à mesure (voir section 10), l'attente ressentie ne
-dépend plus de cette limite : elle est donc passée à `-1` (aucune limite), la
-génération s'arrêtant d'elle-même sur le jeton de fin du modèle. `OLLAMA_TIMEOUT`
-reste le garde-fou contre une génération qui partirait en boucle.
+dépend plus de cette limite : elle a donc été relevée à `1024` jetons, très
+au-dessus des réponses observées (150 à 420 jetons).
+
+Cette borne a un second effet, mesuré depuis : **Ollama réserve dans la fenêtre de
+contexte autant de place que `num_predict`**. Avec `-1`, il réservait la moitié de la
+fenêtre et tronquait le prompt — journaux à l'appui : `truncating input prompt`,
+`limit=4098` pour un prompt de 8 951 jetons — ce qui amputait l'instantané de
+l'application fourni à l'assistant. Une valeur finie lui laisse au contraire toute la
+place. `OLLAMA_TIMEOUT` reste le garde-fou contre une génération qui partirait en
+boucle.
 
 ### `backend/app/routers/chatbot.py`
 
@@ -286,7 +293,8 @@ cette variable.
 | `OLLAMA_URL` | `http://ollama:11434/api/chat` | backend | URL de l'API Ollama |
 | `OLLAMA_MODEL` | `llama3.2` | backend | Modèle utilisé |
 | `OLLAMA_KEEP_ALIVE` | `30m` | backend + ollama | Maintien du modèle en mémoire |
-| `OLLAMA_NUM_PREDICT` | `-1` | backend | Longueur maximale de la réponse (`-1` = pas de plafond) |
+| `OLLAMA_NUM_PREDICT` | `1024` | backend | Longueur maximale de la réponse ; détermine aussi la place laissée au prompt |
+| `OLLAMA_NUM_CTX` | `16384` | backend | Taille de la fenêtre de contexte, en jetons |
 | `OLLAMA_TIMEOUT` | `180` | backend | Délai maximal (secondes) |
 | `OLLAMA_NUM_PARALLEL` | `1` | ollama | Requêtes simultanées |
 | `OLLAMA_MAX_LOADED_MODELS` | `1` | ollama | Modèles gardés en mémoire |

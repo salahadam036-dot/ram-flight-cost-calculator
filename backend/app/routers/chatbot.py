@@ -8,12 +8,14 @@ from fastapi.responses import StreamingResponse
 from app.config import (
     OLLAMA_KEEP_ALIVE,
     OLLAMA_MODEL,
+    OLLAMA_NUM_CTX,
     OLLAMA_NUM_PREDICT,
     OLLAMA_TIMEOUT,
     OLLAMA_URL,
 )
 from app.deps import get_current_user
 from app.schemas import ChatbotOut, ChatbotRequest
+from app.services.app_context import build_app_context
 
 router = APIRouter(prefix="/chatbot", tags=["chatbot"])
 
@@ -37,12 +39,25 @@ L'application permet de :
 Navigation : Tableau de Bord | Vols | Flotte | Scenarios | Prevision | Risque & Rendement | Utilisateurs (admin)
 Connexion par defaut : admin / admin123
 
+Un resume de l'etat reel de l'application (flotte, aeroports, vols, indicateurs,
+simulations) est fourni ci-dessous, apres ce prompt. Appuie-toi dessus pour donner
+des chiffres exacts, et cite les vols par leur numero et leur identifiant.
+Pour les totaux, les moyennes, les comptages et les classements (meilleure ou pire
+marge), fie-toi aux sections INDICATEURS, CLASSEMENTS et PAR AVION : elles font foi.
+La liste des vols sert a retrouver le detail d'un vol precis, pas a compter ni a
+comparer. Si une information n'y figure pas, dis-le clairement au lieu de l'inventer.
+
 Si la question ne concerne pas l'application, redirige poliment vers le sujet."""
 
 
 def _conversation(messages) -> list:
-    """Ajoute le prompt systeme a l'historique envoye par le frontend."""
-    return [{"role": "system", "content": SYSTEM_PROMPT}] + [
+    """Prompt systeme enrichi de l'etat de l'application, puis historique.
+
+    Le contexte est reconstruit a chaque question : l'assistant voit donc l'etat
+    reel de la base, et pas seulement la liste des fonctionnalites.
+    """
+    systeme = "%s\n\n%s" % (SYSTEM_PROMPT, build_app_context())
+    return [{"role": "system", "content": systeme}] + [
         {"role": m.role, "content": m.content} for m in messages
     ]
 
@@ -57,7 +72,7 @@ def _build_payload(messages, stream: bool) -> bytes:
             # Garde le modele en memoire entre deux questions (defaut : 5 min).
             "keep_alive": OLLAMA_KEEP_ALIVE,
             # -1 = pas de plafond : la reponse se termine sur EOS.
-            "options": {"num_predict": OLLAMA_NUM_PREDICT},
+            "options": {"num_predict": OLLAMA_NUM_PREDICT, "num_ctx": OLLAMA_NUM_CTX},
         }
     ).encode("utf-8")
 

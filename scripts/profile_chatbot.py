@@ -21,6 +21,7 @@ Bibliotheque standard uniquement, aucune dependance a installer.
 import json
 import re
 import statistics
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -74,23 +75,48 @@ def tokens_per_second(count, duration_ns):
     return count / (duration_ns / 1e9)
 
 
-def read_backend_settings():
-    """Lit le prompt systeme et les reglages Ollama directement dans le code."""
-    router = (REPO / "backend/app/routers/chatbot.py").read_text(encoding="utf-8")
-    match = re.search(r'SYSTEM_PROMPT = """(.*?)"""', router, re.S)
-    system = match.group(1) if match else ""
+def _valeur_config(config, motif, defaut):
+    correspondance = re.search(motif, config)
+    return correspondance.group(1) if correspondance else defaut
 
+
+def read_backend_settings():
+    """Reglages Ollama lus dans le code du backend."""
     config = (REPO / "backend/app/config.py").read_text(encoding="utf-8")
-    keep = re.search(r'OLLAMA_KEEP_ALIVE\s*=\s*os\.getenv\("OLLAMA_KEEP_ALIVE",\s*"([^"]+)"\)', config)
-    predict = re.search(r'OLLAMA_NUM_PREDICT\s*=\s*int\(os\.getenv\("OLLAMA_NUM_PREDICT",\s*"([^"]+)"\)\)', config)
     return (
-        system,
-        keep.group(1) if keep else "30m",
-        int(predict.group(1)) if predict else 256,
+        _valeur_config(
+            config, r'OLLAMA_KEEP_ALIVE\s*=\s*os\.getenv\("OLLAMA_KEEP_ALIVE",\s*"([^"]+)"\)', "30m"
+        ),
+        int(_valeur_config(config, r'OLLAMA_NUM_PREDICT\s*=\s*int\(os\.getenv\("OLLAMA_NUM_PREDICT",\s*"([^"]+)"\)\)', "1024")),
+        int(_valeur_config(config, r'OLLAMA_NUM_CTX\s*=\s*int\(os\.getenv\("OLLAMA_NUM_CTX",\s*"([^"]+)"\)\)', "16384")),
     )
 
 
-def ollama_payload(system, history, keep_alive, num_predict):
+def read_system_prompt():
+    """Prompt systeme complet, contexte applicatif inclus.
+
+    Le backend le construit a l'execution depuis la base : on le lui demande
+    directement, afin que les appels directs a Ollama portent exactement la meme
+    charge utile que l'application. Repli sur le prompt du code source si le
+    conteneur n'est pas joignable.
+    """
+    commande = [
+        "docker", "exec", "ram-backend", "python", "-c",
+        "from app.routers.chatbot import _conversation; from app.schemas import ChatMessage; "
+        "print(_conversation([ChatMessage(role='user', content='x')])[0]['content'])",
+    ]
+    try:
+        resultat = subprocess.run(commande, capture_output=True, text=True, timeout=60, check=True)
+        if resultat.stdout.strip():
+            return resultat.stdout.rstrip("\n")
+    except Exception:
+        pass
+    router = (REPO / "backend/app/routers/chatbot.py").read_text(encoding="utf-8")
+    correspondance = re.search(r'SYSTEM_PROMPT = """(.*?)"""', router, re.S)
+    return correspondance.group(1) if correspondance else ""
+
+
+def ollama_payload(system, history, keep_alive, num_predict, num_ctx):
     """Meme charge utile que celle construite par le backend."""
     messages = [{"role": "system", "content": system}] + list(history)
     return {
@@ -98,12 +124,13 @@ def ollama_payload(system, history, keep_alive, num_predict):
         "stream": False,
         "messages": messages,
         "keep_alive": keep_alive,
-        "options": {"num_predict": num_predict},
+        "options": {"num_predict": num_predict, "num_ctx": num_ctx},
     }
 
 
 def main():
-    system, keep_alive, num_predict = read_backend_settings()
+    keep_alive, num_predict, num_ctx = read_backend_settings()
+    system = read_system_prompt()
 
     print("=" * 72)
     print("PROFILAGE DE L'ASSISTANT OLLAMA")
@@ -178,7 +205,7 @@ def main():
     details = []
     for i, question in enumerate(QUESTIONS, start=1):
         turn = history[: 2 * i - 1]  # jusqu'au message utilisateur inclus
-        status, _, body, wall = request(OLLAMA + "/api/chat", ollama_payload(system, turn, keep_alive, num_predict))
+        status, _, body, wall = request(OLLAMA + "/api/chat", ollama_payload(system, turn, keep_alive, num_predict, num_ctx))
         if status != 200:
             print("    tour %-4d ECHEC HTTP %s" % (i, status))
             return 1
@@ -238,7 +265,7 @@ def main():
     ollama_floor = []
     for _ in range(5):
         # Un seul jeton genere : mesure le plancher HTTP + lecture du prompt.
-        _, _, _, elapsed = request(OLLAMA + "/api/chat", ollama_payload(system, [{"role": "user", "content": "hi"}], keep_alive, 1))
+        _, _, _, elapsed = request(OLLAMA + "/api/chat", ollama_payload(system, [{"role": "user", "content": "hi"}], keep_alive, 1, num_ctx))
         ollama_floor.append(elapsed)
     print("    backend, requete rejetee (401)     : %10s" % ms(statistics.median(rejected)))
     print("    Ollama, 1 jeton genere             : %10s" % ms(statistics.median(ollama_floor)))
@@ -258,8 +285,8 @@ def main():
     # -- 7. Demarrage a froid ----------------------------------------------
     print("\n[7] Demarrage a froid (dechargement force puis rechargement)")
     # keep_alive=0 decharge le modele : la requete suivante paie le rechargement.
-    request(OLLAMA + "/api/chat", ollama_payload(system, [{"role": "user", "content": "hi"}], "0", 1))
-    _, _, body, _ = request(OLLAMA + "/api/chat", ollama_payload(system, [{"role": "user", "content": "hi"}], keep_alive, 8))
+    request(OLLAMA + "/api/chat", ollama_payload(system, [{"role": "user", "content": "hi"}], "0", 1, num_ctx))
+    _, _, body, _ = request(OLLAMA + "/api/chat", ollama_payload(system, [{"role": "user", "content": "hi"}], keep_alive, 8, num_ctx))
     cold = json.loads(body)
     print("    rechargement du modele             : %10s" % ms(cold.get("load_duration", 0) / 1e9))
     print("    total de la requete a froid        : %10s" % ms(cold.get("total_duration", 0) / 1e9))
@@ -267,7 +294,7 @@ def main():
     # -- 8. Deux requetes simultanees --------------------------------------
     print("\n[8] Deux requetes simultanees (OLLAMA_NUM_PARALLEL=1)")
     turn = history[: 2 * len(QUESTIONS) - 1]
-    payload = ollama_payload(system, turn, keep_alive, num_predict)
+    payload = ollama_payload(system, turn, keep_alive, num_predict, num_ctx)
     t0 = time.perf_counter()
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [pool.submit(request, OLLAMA + "/api/chat", payload) for _ in range(2)]
