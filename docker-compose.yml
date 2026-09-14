@@ -1,0 +1,80 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ram-db
+    environment:
+      POSTGRES_USER: ram
+      POSTGRES_PASSWORD: ram_password
+      POSTGRES_DB: ram_flights
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ram -d ram_flights"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ram-ollama
+    ports:
+      - "11434:11434"
+    environment:
+      # Garde le modele en memoire 30 min apres la derniere question. Defaut
+      # Ollama : 5 min, ce qui force un rechargement de ~5 s avant de repondre.
+      OLLAMA_KEEP_ALIVE: 30m
+      # Une seule requete et un seul modele a la fois : la VM Docker dispose
+      # d'environ 8 Go, inutile de dupliquer les poids en memoire.
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Pre-charge le modele de chat au premier demarrage si absent (idempotent).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "ollama serve & sleep 3; ollama pull llama3.2; wait"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: ram-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://ram:ram_password@db:5432/ram_flights
+      # Remplacer par http://host.docker.internal:11434/api/chat pour utiliser un
+      # Ollama natif (Metal) au lieu du conteneur.
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434/api/chat}
+      OLLAMA_MODEL: llama3.2
+      # IMPORTANT : remplacer cette valeur de demonstration par un secret
+      # aleatoire et unique en production. Voir .env.example.
+      RAM_SECRET_KEY: ${RAM_SECRET_KEY:-change-me-random-secret-please}
+      RAM_TOKEN_EXPIRE: "720"
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: ram-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  ollama_data:

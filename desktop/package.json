@@ -1,0 +1,45 @@
+{
+  "name": "ram-flight-cost-desktop",
+  "version": "1.0.0",
+  "description": "Royal Air Maroc — Flight Cost Calculator (Electron desktop shell)",
+  "author": "Royal Air Maroc",
+  "main": "main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "RAM_DEV=1 electron .",
+    "build:frontend": "npm --prefix ../frontend run build",
+    "package": "npm run build:frontend && electron-builder --win --x64",
+    "dist:win": "electron-builder --win --x64",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.ram.flightcost",
+    "productName": "RAM Flight Cost Calculator",
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      { "from": "../frontend/dist", "to": "dist" }
+    ],
+    "directories": {
+      "output": "../dist-exe"
+    },
+    "icon": "assets/icon.png",
+    "win": {
+      "target": ["nsis"],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

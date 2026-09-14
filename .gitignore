@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+backend/data/*.db
+backend/data/backups/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+desktop/release/
+desktop/*.zip
+desktop/*.tar
+dist-exe/
+
+# Docker image export
+*.tar
+
+# Secrets (ne jamais versionner de secrets reels).
+.env
+.env.*
+!.env.example
+# URL de build de l'application desktop (non secret, requis pour la build).
+!frontend/.env.production
+
+# OS / editor
+.DS_Store
+*.log
+*:Zone.Identifier
+
+# Fichiers de travail temporaires (brouillons, notes, exports intermediaires).
+.tmp_*

@@ -1,0 +1,27 @@
+# Surcharge Docker Compose : active l'acceleration GPU NVIDIA pour Ollama.
+#
+# Utilisation (machine Linux equipee d'un GPU NVIDIA) :
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+#
+# Prerequis sur l'hote :
+#   1. pilote NVIDIA installe (verifier avec : nvidia-smi)
+#   2. NVIDIA Container Toolkit installe et configure pour Docker :
+#        sudo apt-get install -y nvidia-container-toolkit
+#        sudo nvidia-ctk runtime configure --runtime=docker
+#        sudo systemctl restart docker
+#   3. verification : le GPU doit apparaitre dans un conteneur de test
+#        docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
+#
+# Apres demarrage, controler que le GPU est bien utilise :
+#   docker exec ram-ollama ollama ps     -> la colonne PROCESSOR doit indiquer 100% GPU
+# Voir docs/ollama-performance.md pour le detail.
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
