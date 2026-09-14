@@ -35,6 +35,7 @@ centrée sur l'analyse du coût et de la rentabilité des vols.
 | [Sécurité & authentification](securite.md) | JWT, bcrypt, rôles, clés secrètes |
 | [Chatbot IA](chatbot.md) | Assistant intégré (Ollama / llama3.2) |
 | [Performance de l'assistant IA](ollama-performance.md) | Diagnostic de latence et déploiement sur GPU (RTX 4090) |
+| [Comparaison des modèles d'IA](rapport-benchmark-modeles.md) | Banc d'essai llama3.2 / llama3.1:8b : exactitude, vitesse, mémoire et recommandation |
 | [Import Excel](import-excel.md) | Format du fichier et correspondance des avions |
 
 > L'onglet **Connexion** permet de s'authentifier avant d'accéder à l'application.
