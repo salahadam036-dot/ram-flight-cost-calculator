@@ -157,6 +157,12 @@ incrémentation de la version, copie des sources dans un dossier Windows natif,
 compilation du frontend, génération de l'installeur par electron-builder, puis
 recopie de l'installeur dans `dist-exe/`.
 
+Pour un build sans ligne de commande, double-cliquez `build-exe.cmd` : il
+appelle `build-exe.ps1` avec `-ExecutionPolicy Bypass` et laisse la fenêtre
+ouverte à la fin, ce qui permet de lire le chemin et l'empreinte SHA-256 de
+l'installeur. Il accepte les mêmes options que le script PowerShell, par
+exemple `build-exe.cmd -NoBump` lancé depuis un terminal.
+
 ```powershell
 .\build-exe.ps1                  # incrémente la version (1.0.1 -> 1.0.2)
 .\build-exe.ps1 -Version 1.2.0   # impose une version

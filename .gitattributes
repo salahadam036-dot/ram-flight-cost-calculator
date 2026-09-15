@@ -11,6 +11,11 @@
 # Scripts PowerShell : conservés en CRLF, leurs outils étant sous Windows.
 *.ps1 text eol=crlf
 
+# Scripts de commande Windows : destines au double-clic, donc imperativement
+# en CRLF (cmd.exe interprete mal un fichier en LF).
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 # Binaires : aucune conversion, jamais.
 *.jpg binary
 *.png binary
