@@ -1,0 +1,18 @@
+# Fins de ligne et fichiers binaires.
+#
+# Le dépôt stocke les fichiers texte en LF. Sans cette déclaration, un fichier
+# édité sous Windows revient en CRLF et produit un diff de tout le fichier : le
+# dépôt contenait déjà les deux conventions mélangées (docs/ en CRLF, code en LF).
+#
+# Après modification de ce fichier, pour aligner une copie de travail existante :
+#   git add --renormalize .
+* text=auto
+
+# Scripts PowerShell : conservés en CRLF, leurs outils étant sous Windows.
+*.ps1 text eol=crlf
+
+# Binaires : aucune conversion, jamais.
+*.jpg binary
+*.png binary
+*.xlsx binary
+*.exe binary
