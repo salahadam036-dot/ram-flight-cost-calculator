@@ -152,6 +152,24 @@ npm start
 
 ### Compiler un installeur natif
 
+Le script `build-exe.ps1` (PowerShell, à la racine du projet) enchaîne tout :
+incrémentation de la version, copie des sources dans un dossier Windows natif,
+compilation du frontend, génération de l'installeur par electron-builder, puis
+recopie de l'installeur dans `dist-exe/`.
+
+```powershell
+.\build-exe.ps1                  # incrémente la version (1.0.1 -> 1.0.2)
+.\build-exe.ps1 -Version 1.2.0   # impose une version
+.\build-exe.ps1 -NoBump          # reconstruit sans changer la version
+.\build-exe.ps1 -KeepBuildDir    # conserve le dossier de travail Windows
+```
+
+La version de `desktop/package.json` détermine le nom de l'installeur
+(`RAM Flight Cost Calculator Setup <version>.exe`). Le script affiche le chemin
+du fichier et son empreinte SHA-256, puis supprime son dossier de travail.
+
+Sans le script, l'équivalent manuel :
+
 ```bash
 cd frontend && npm run build
 cd ../desktop
@@ -160,7 +178,8 @@ npm run dist:win     # Windows (.exe / NSIS)
 npm run dist:linux   # Linux (AppImage)
 ```
 
-L'installeur est généré dans `desktop/release/`.
+L'installeur est généré dans `dist-exe/`. Ce dossier n'est pas versionné : les
+installeurs pèsent environ 80 Mo et se régénèrent à volonté.
 
 > ⚠️ L'application desktop s'attend à ce que le backend réponde sur
 > `http://127.0.0.1:8000` (voir `frontend/.env.production`). Assurez-vous que le
