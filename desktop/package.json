@@ -1,6 +1,6 @@
 {
   "name": "ram-flight-cost-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Royal Air Maroc — Flight Cost Calculator (Electron desktop shell)",
   "author": "Royal Air Maroc",
   "main": "main.cjs",
