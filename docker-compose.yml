@@ -35,7 +35,7 @@ services:
     # Pre-charge le modele de chat au premier demarrage si absent (idempotent).
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - "ollama serve & sleep 3; ollama pull llama3.2; wait"
+      - "ollama serve & sleep 3; ollama pull llama3.1:8b; wait"
     healthcheck:
       test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 15s
@@ -54,7 +54,13 @@ services:
       # Remplacer par http://host.docker.internal:11434/api/chat pour utiliser un
       # Ollama natif (Metal) au lieu du conteneur.
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434/api/chat}
-      OLLAMA_MODEL: llama3.2
+      # Modele et fenetre de contexte : voir docs/rapport-benchmark-modeles.md.
+      # llama3.1:8b repond juste sur les cinq questions de controle du banc
+      # d'essai, contre quatre pour llama3.2, qui se trompe en silence sur les
+      # questions de comptage. 10 240 est la plus grande fenetre qui tient
+      # entierement dans les 8 Go de VRAM de la carte de reference.
+      OLLAMA_MODEL: llama3.1:8b
+      OLLAMA_NUM_CTX: "10240"
       # IMPORTANT : remplacer cette valeur de demonstration par un secret
       # aleatoire et unique en production. Voir .env.example.
       RAM_SECRET_KEY: ${RAM_SECRET_KEY:-change-me-random-secret-please}

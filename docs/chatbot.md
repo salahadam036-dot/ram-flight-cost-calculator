@@ -9,7 +9,7 @@ de l'application.
 - Le chatbot fait appel au service **Ollama** (conteneur `ollama`) via la route
   `POST /api/chatbot/stream`, qui diffuse la réponse au fur et à mesure
   (Server-Sent Events). La route `POST /api/chatbot` renvoie la réponse en un bloc.
-- Le modèle utilisé est **`llama3.2`** (configurable via `OLLAMA_MODEL`).
+- Le modèle utilisé est **`llama3.1:8b`** (configurable via `OLLAMA_MODEL`).
 - Un **prompt système** (dans `routers/chatbot.py`) borne l'assistant : il ne répond
   qu'à des questions concernant l'application, en français.
 - À chaque question, l'assistant reçoit en plus un **état complet de
@@ -57,8 +57,8 @@ vérifie le contenu des réponses sur la base de démonstration, et
 ## Dépendances
 
 - Le conteneur `ollama` doit être démarré (inclus dans `docker compose up`).
-- Le modèle `llama3.2` est **pré-chargé automatiquement** au premier démarrage du
-  conteneur (≈ 2 Go, peut prendre quelques minutes la première fois).
+- Le modèle `llama3.1:8b` est **pré-chargé automatiquement** au premier démarrage du
+  conteneur (≈ 5 Go, peut prendre quelques minutes la première fois).
 
 ## Sujets couverts
 
@@ -79,5 +79,5 @@ L'assistant peut vous aider sur :
 | Erreur « Ollama n'est pas demarre » | Conteneur `ollama` arrêté | `docker compose up -d ollama` |
 | Réponse très lente | Premier chargement du modèle | Attendre le chargement (`ollama list` pour vérifier) |
 | Réponse lente **à chaque** question | Ollama tourne sur CPU, sans GPU | Voir [Performance de l'assistant IA](ollama-performance.md) |
-| Aucune réponse | Modèle absent | `docker exec ram-ollama ollama pull llama3.2` |
+| Aucune réponse | Modèle absent | `docker exec ram-ollama ollama pull llama3.1:8b` |
 | Réponses qui ignorent les données | Instantané tronqué (fenêtre trop petite) | Chercher `truncating input prompt` dans `docker logs ram-ollama`, puis augmenter `OLLAMA_NUM_CTX` |

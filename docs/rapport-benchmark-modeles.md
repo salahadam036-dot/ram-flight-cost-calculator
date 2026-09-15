@@ -180,6 +180,11 @@ OLLAMA_NUM_CTX=10240
 
 Puis `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`.
 
+**Décision appliquée** : `docker-compose.yml` définit désormais
+`OLLAMA_MODEL: llama3.1:8b` et `OLLAMA_NUM_CTX: "10240"`, et ces mêmes valeurs
+sont les défauts de `backend/app/config.py`. Après bascule, les cinq questions
+de contrôle sont justes et le prompt de 8 030 jetons n'est pas tronqué.
+
 Si les conversations longues deviennent courantes, passer `OLLAMA_NUM_CTX` à `12288`
 et surveiller la colonne `PROCESSOR` de `docker exec ram-ollama ollama ps` : dès
 qu'elle n'affiche plus `100% GPU`, une partie du modèle tourne sur le processeur.

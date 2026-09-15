@@ -80,9 +80,50 @@ def _valeur_config(config, motif, defaut):
     return correspondance.group(1) if correspondance else defaut
 
 
+def _valeur_env(nom):
+    """Variable d'environnement du conteneur backend (prioritaire sur le code)."""
+    try:
+        resultat = subprocess.run(
+            ["docker", "exec", "ram-backend", "printenv", nom],
+            capture_output=True, text=True, timeout=30, check=True,
+        )
+        return resultat.stdout.strip()
+    except Exception:
+        return ""
+
+
+_MODELE = None
+
+
+def modele_du_backend():
+    """Modele reellement utilise par l'application.
+
+    Docker Compose peut surcharger OLLAMA_MODEL : interroger le code source ne
+    suffirait pas, et le script mesurerait un autre modele que l'application.
+    """
+    global _MODELE
+    if _MODELE is None:
+        _MODELE = _valeur_env("OLLAMA_MODEL") or _valeur_config(
+            (REPO / "backend/app/config.py").read_text(encoding="utf-8"),
+            r'OLLAMA_MODEL\s*=\s*os\.getenv\("OLLAMA_MODEL",\s*"([^"]+)"\)',
+            "llama3.2",
+        )
+    return _MODELE
+
+
 def read_backend_settings():
-    """Reglages Ollama lus dans le code du backend."""
+    """Reglages Ollama, tels que le backend les recoit."""
     config = (REPO / "backend/app/config.py").read_text(encoding="utf-8")
+    if _valeur_env("OLLAMA_NUM_CTX"):
+        return (
+            _valeur_env("OLLAMA_KEEP_ALIVE") or _valeur_config(
+                config, r'OLLAMA_KEEP_ALIVE\s*=\s*os\.getenv\("OLLAMA_KEEP_ALIVE",\s*"([^"]+)"\)', "30m"
+            ),
+            int(_valeur_env("OLLAMA_NUM_PREDICT") or _valeur_config(
+                config, r'OLLAMA_NUM_PREDICT\s*=\s*int\(os\.getenv\("OLLAMA_NUM_PREDICT",\s*"([^"]+)"\)\)', "1024"
+            )),
+            int(_valeur_env("OLLAMA_NUM_CTX")),
+        )
     return (
         _valeur_config(
             config, r'OLLAMA_KEEP_ALIVE\s*=\s*os\.getenv\("OLLAMA_KEEP_ALIVE",\s*"([^"]+)"\)', "30m"
@@ -120,7 +161,7 @@ def ollama_payload(system, history, keep_alive, num_predict, num_ctx):
     """Meme charge utile que celle construite par le backend."""
     messages = [{"role": "system", "content": system}] + list(history)
     return {
-        "model": "llama3.2",
+        "model": modele_du_backend(),
         "stream": False,
         "messages": messages,
         "keep_alive": keep_alive,

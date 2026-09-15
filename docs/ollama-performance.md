@@ -190,7 +190,7 @@ cp .env.example .env          # puis renseigner RAM_SECRET_KEY (voir README)
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
-Le premier démarrage est plus long : Ollama télécharge `llama3.2` (≈ 2 Go).
+Le premier démarrage est plus long : Ollama télécharge `llama3.1:8b` (≈ 5 Go).
 
 ### 5.3 Vérifier que le GPU est réellement utilisé
 
@@ -291,7 +291,7 @@ cette variable.
 | Variable | Défaut | Où | Rôle |
 | --- | --- | --- | --- |
 | `OLLAMA_URL` | `http://ollama:11434/api/chat` | backend | URL de l'API Ollama |
-| `OLLAMA_MODEL` | `llama3.2` | backend | Modèle utilisé |
+| `OLLAMA_MODEL` | `llama3.1:8b` | backend | Modèle utilisé |
 | `OLLAMA_KEEP_ALIVE` | `30m` | backend + ollama | Maintien du modèle en mémoire |
 | `OLLAMA_NUM_PREDICT` | `1024` | backend | Longueur maximale de la réponse ; détermine aussi la place laissée au prompt |
 | `OLLAMA_NUM_CTX` | `16384` | backend | Taille de la fenêtre de contexte, en jetons |

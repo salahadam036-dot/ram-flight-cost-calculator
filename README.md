@@ -21,7 +21,7 @@ Cet outil aide à répondre à des questions concrètes :
 - **Prévision** — projection des tendances par régression linéaire.
 - **Risque & Rendement** — Monte Carlo, KPI et optimisation du prix.
 - **Utilisateurs** — gestion des comptes (admin).
-- **Chatbot IA** — assistant intégré (modèle Ollama `llama3.2`).
+- **Chatbot IA** — assistant intégré (modèle Ollama `llama3.1:8b`).
 - **Export PDF** — rapport du tableau de bord.
 
 > 📖 Chaque onglet est décrit en détail dans [`docs/`](docs/README.md).
@@ -74,7 +74,7 @@ docker compose up -d --build
 | PostgreSQL   | localhost:5432          |
 
 Le premier démarrage est un peu plus long : Ollama télécharge automatiquement
-le modèle `llama3.2` (≈ 2 Go) s'il n'est pas déjà présent.
+le modèle `llama3.1:8b` (≈ 5 Go) s'il n'est pas déjà présent.
 
 #### Variante GPU (NVIDIA)
 
@@ -178,7 +178,7 @@ L'installeur est généré dans `desktop/release/`.
                                  ▼
                            ┌────────────┐
                            │   Ollama   │
-                           │  llama3.2  │
+                           │  llama3.1  │
                            └────────────┘
 ```
 
@@ -200,7 +200,7 @@ L'installeur est généré dans `desktop/release/`.
   (aucune dépendance sklearn).
 - Les mots de passe sont hachés avec **bcrypt**. Les anciens hachages SHA-256
   (version antérieure) sont migrés automatiquement à la connexion.
-- Le chatbot utilise un modèle Ollama (`llama3.2`), pré-chargé au démarrage du
+- Le chatbot utilise un modèle Ollama (`llama3.1:8b`), pré-chargé au démarrage du
   conteneur `ollama`.
 - Les performances de l'assistant dépendent fortement de la présence d'un GPU
   (facteur ~50-100×). Diagnostic complet et procédure GPU dans

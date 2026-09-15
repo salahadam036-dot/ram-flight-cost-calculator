@@ -14,14 +14,14 @@ l'interface (onglets), l'API et le code.
                                       │ HTTP
                                       ▼
                                 ┌────────────┐
-                                │   Ollama   │  (chatbot, modèle llama3.2)
+                                │   Ollama   │  (chatbot, modèle llama3.1:8b)
                                 └────────────┘
 ```
 
 - **Frontend** : React + Vite + TypeScript + Tailwind + shadcn/ui (dossier `frontend/`).
 - **Backend** : FastAPI + psycopg (dossier `backend/`), calculs numériques appuyés sur NumPy/SciPy.
 - **Base de données** : PostgreSQL 16 (conteneur `db`).
-- **Chatbot** : Ollama (conteneur `ollama`), modèle `llama3.2`.
+- **Chatbot** : Ollama (conteneur `ollama`), modèle `llama3.1:8b`.
 - **Desktop** : coquille Electron (dossier `desktop/`) servant le frontend compilé.
 
 Tout est orchestré avec Docker Compose (`docker-compose.yml`).

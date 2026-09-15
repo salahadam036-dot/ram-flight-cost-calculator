@@ -36,7 +36,7 @@ CORS_ORIGINS = [
 # Ollama (chatbot). L'hote "ollama" est le service Docker Compose ; en dehors de
 # Docker, surcharger avec http://localhost:11434/api/chat.
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434/api/chat")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
 
 # Duree pendant laquelle le modele reste charge apres la derniere question.
 # Defaut Ollama : 5 min. Passe ce delai, le modele est decharge et la question
@@ -60,9 +60,9 @@ OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "1024"))
 # prompt systeme + l'etat de l'application (voir app/services/app_context.py) +
 # l'historique de la conversation. L'augmenter consomme de la memoire : le cache
 # KV croit avec cette valeur. La baisser fait perdre les messages les plus anciens.
-# Ollama reserve par ailleurs la moitie de cette fenetre a la generation quand
-# num_predict est sans plafond : seuls ~8 000 jetons restent donc pour le prompt.
-OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "16384"))
+# Ollama reserve par ailleurs pour la generation autant de jetons que num_predict :
+# avec 1 024, il reste donc environ 9 200 jetons pour le prompt de l'assistant.
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "10240"))
 
 # Delai maximal d'attente de la reponse Ollama, en secondes. A garder au-dessus du
 # pire cas : prompt + (num_predict / vitesse de generation).

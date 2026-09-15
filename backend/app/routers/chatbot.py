@@ -33,7 +33,7 @@ L'application permet de :
 - Consulter un tableau de bord avec KPIs et graphiques
 - Importer des vols depuis Excel
 - Exporter le dashboard en PDF
-- Poser des questions via le chatbot (Ollama / llama3.2)
+- Poser des questions via le chatbot (Ollama / llama3.1:8b)
 - Gerer les utilisateurs (admin uniquement)
 
 Navigation : Tableau de Bord | Vols | Flotte | Scenarios | Prevision | Risque & Rendement | Utilisateurs (admin)

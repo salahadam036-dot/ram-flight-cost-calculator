@@ -73,7 +73,7 @@ coût réel de chaque vol, puis fournit quatre couches d'analyse :
 | Atout | Pourquoi ça compte |
 | --- | --- |
 | **Full-stack** | React + FastAPI + PostgreSQL, le tout Dockerisé |
-| **IA embarquée** | Chatbot assistant (Ollama / llama3.2) |
+| **IA embarquée** | Chatbot assistant (Ollama / llama3.1:8b) |
 | **Analyse quantitative** | Régression via `scipy.stats.linregress`, Monte Carlo vectorisé (NumPy), optimisation par balayage sur la pile scientifique standard |
 | **Sécurité** | JWT, bcrypt, rôles, clés secrètes |
 | **Analyse aéronautique réelle** | KPI standards de l'industrie (ASK, RASK, CASK, BELF, yield) |
@@ -212,7 +212,7 @@ sequenceDiagram
     F-->>U: affiche la marge
     U->>F: question chatbot
     F->>B: POST /api/chatbot
-    B->>O: /api/chat (llama3.2)
+    B->>O: /api/chat (llama3.1:8b)
     O-->>B: réponse
     B-->>F: {content}
     F-->>U: bulle de réponse
@@ -235,7 +235,7 @@ flowchart TB
     end
     A -->|Bearer token| R
     DB --> Postgres[(PostgreSQL)]
-    R -->|HTTP| Ollama[(Ollama llama3.2)]
+    R -->|HTTP| Ollama[(Ollama llama3.1:8b)]
 ```
 
 ### Points techniques internes
