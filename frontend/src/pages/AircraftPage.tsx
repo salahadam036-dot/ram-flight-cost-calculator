@@ -46,18 +46,20 @@ type AircraftSortKey =
   | "model"
   | "capacity"
   | "fuel_consumption_per_hour"
-  | "maintenance_cost_per_flight"
-  | "amortization_cost_per_flight"
-  | "crew_cost_per_flight";
+  | "maintenance_cost_per_hour"
+  | "amortization_cost_per_hour"
+  | "crew_cost_per_hour"
+  | "range_km";
 
 const AIRCRAFT_COLUMNS: { key: AircraftSortKey; label: string; align?: "right" }[] = [
   { key: "type", label: "Type" },
   { key: "model", label: "Modele" },
   { key: "capacity", label: "Capacite", align: "right" },
   { key: "fuel_consumption_per_hour", label: "Carburant L/h", align: "right" },
-  { key: "maintenance_cost_per_flight", label: "Maintenance", align: "right" },
-  { key: "amortization_cost_per_flight", label: "Amortissement", align: "right" },
-  { key: "crew_cost_per_flight", label: "Equipage", align: "right" },
+  { key: "maintenance_cost_per_hour", label: "Maintenance MAD/h", align: "right" },
+  { key: "amortization_cost_per_hour", label: "Amortissement MAD/h", align: "right" },
+  { key: "crew_cost_per_hour", label: "Equipage MAD/h", align: "right" },
+  { key: "range_km", label: "Rayon km", align: "right" },
 ];
 
 interface FormState {
@@ -65,10 +67,11 @@ interface FormState {
   model: string;
   capacity: string;
   fuel_consumption_per_hour: string;
-  maintenance_cost_per_flight: string;
-  amortization_cost_per_flight: string;
-  crew_cost_per_flight: string;
-  insurance_cost_per_flight: string;
+  maintenance_cost_per_hour: string;
+  amortization_cost_per_hour: string;
+  crew_cost_per_hour: string;
+  insurance_cost_per_hour: string;
+  range_km: string;
 }
 
 const emptyForm: FormState = {
@@ -76,10 +79,11 @@ const emptyForm: FormState = {
   model: "",
   capacity: "180",
   fuel_consumption_per_hour: "2600",
-  maintenance_cost_per_flight: "3500",
-  amortization_cost_per_flight: "4200",
-  crew_cost_per_flight: "8000",
-  insurance_cost_per_flight: "1200",
+  maintenance_cost_per_hour: "10700",
+  amortization_cost_per_hour: "6800",
+  crew_cost_per_hour: "17500",
+  insurance_cost_per_hour: "700",
+  range_km: "5436",
 };
 
 export default function AircraftPage() {
@@ -122,10 +126,11 @@ export default function AircraftPage() {
       model: ac.model,
       capacity: String(ac.capacity),
       fuel_consumption_per_hour: String(ac.fuel_consumption_per_hour),
-      maintenance_cost_per_flight: String(ac.maintenance_cost_per_flight),
-      amortization_cost_per_flight: String(ac.amortization_cost_per_flight),
-      crew_cost_per_flight: String(ac.crew_cost_per_flight),
-      insurance_cost_per_flight: String(ac.insurance_cost_per_flight),
+      maintenance_cost_per_hour: String(ac.maintenance_cost_per_hour),
+      amortization_cost_per_hour: String(ac.amortization_cost_per_hour),
+      crew_cost_per_hour: String(ac.crew_cost_per_hour),
+      insurance_cost_per_hour: String(ac.insurance_cost_per_hour),
+      range_km: String(ac.range_km),
     });
     setOpen(true);
   };
@@ -140,10 +145,11 @@ export default function AircraftPage() {
       model: form.model.trim(),
       capacity: Number(form.capacity),
       fuel_consumption_per_hour: Number(form.fuel_consumption_per_hour),
-      maintenance_cost_per_flight: Number(form.maintenance_cost_per_flight),
-      amortization_cost_per_flight: Number(form.amortization_cost_per_flight),
-      crew_cost_per_flight: Number(form.crew_cost_per_flight),
-      insurance_cost_per_flight: Number(form.insurance_cost_per_flight),
+      maintenance_cost_per_hour: Number(form.maintenance_cost_per_hour),
+      amortization_cost_per_hour: Number(form.amortization_cost_per_hour),
+      crew_cost_per_hour: Number(form.crew_cost_per_hour),
+      insurance_cost_per_hour: Number(form.insurance_cost_per_hour),
+      range_km: Number(form.range_km),
     };
     try {
       if (editing) await apiPut(`/aircraft/${editing.id}`, body);
@@ -226,9 +232,10 @@ export default function AircraftPage() {
                   <TableCell className="font-medium">{ac.model}</TableCell>
                   <TableCell className="text-right">{ac.capacity}</TableCell>
                   <TableCell className="text-right">{formatNumber(ac.fuel_consumption_per_hour)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(ac.maintenance_cost_per_flight)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(ac.amortization_cost_per_flight)}</TableCell>
-                  <TableCell className="text-right">{formatNumber(ac.crew_cost_per_flight)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(ac.maintenance_cost_per_hour)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(ac.amortization_cost_per_hour)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(ac.crew_cost_per_hour)}</TableCell>
+                  <TableCell className="text-right">{formatNumber(ac.range_km)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Tooltip>
@@ -278,10 +285,11 @@ export default function AircraftPage() {
             <Field label="Modele" value={form.model} onChange={(v) => setForm({ ...form, model: v })} placeholder="ex: Boeing 737-800" />
             <Field label="Capacite" type="number" value={form.capacity} onChange={(v) => setForm({ ...form, capacity: v })} />
             <Field label="Carburant (L/h)" type="number" value={form.fuel_consumption_per_hour} onChange={(v) => setForm({ ...form, fuel_consumption_per_hour: v })} />
-            <Field label="Maintenance (MAD)" type="number" value={form.maintenance_cost_per_flight} onChange={(v) => setForm({ ...form, maintenance_cost_per_flight: v })} />
-            <Field label="Amortissement (MAD)" type="number" value={form.amortization_cost_per_flight} onChange={(v) => setForm({ ...form, amortization_cost_per_flight: v })} />
-            <Field label="Equipage (MAD)" type="number" value={form.crew_cost_per_flight} onChange={(v) => setForm({ ...form, crew_cost_per_flight: v })} />
-            <Field label="Assurance (MAD)" type="number" value={form.insurance_cost_per_flight} onChange={(v) => setForm({ ...form, insurance_cost_per_flight: v })} />
+            <Field label="Maintenance (MAD/h)" type="number" value={form.maintenance_cost_per_hour} onChange={(v) => setForm({ ...form, maintenance_cost_per_hour: v })} />
+            <Field label="Amortissement (MAD/h)" type="number" value={form.amortization_cost_per_hour} onChange={(v) => setForm({ ...form, amortization_cost_per_hour: v })} />
+            <Field label="Equipage (MAD/h)" type="number" value={form.crew_cost_per_hour} onChange={(v) => setForm({ ...form, crew_cost_per_hour: v })} />
+            <Field label="Assurance (MAD/h)" type="number" value={form.insurance_cost_per_hour} onChange={(v) => setForm({ ...form, insurance_cost_per_hour: v })} />
+            <Field label="Rayon d'action (km)" type="number" value={form.range_km} onChange={(v) => setForm({ ...form, range_km: v })} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Annuler</Button>

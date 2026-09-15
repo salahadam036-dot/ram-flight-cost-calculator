@@ -108,15 +108,15 @@ Ouvrir http://localhost:5173 et se connecter (`admin` / `admin123`).
 
 ### Étape 1 — Tableau de Bord (vue d'ensemble)
 
-- On voit **176 vols analysés** (les 2 vols cargo sont hors analyse), ~82
-  rentables / ~94 déficitaires, un taux global de rentabilité (~47 %), la marge
-  moyenne, le profit net.
-- **À dire** : « C'est la photo d'ensemble. Le réseau est globalement borderline —
-  il y a de bons vols et de mauvais vols mélangés. »
+- On voit **185 vols au total**, dont **183 analysés** (les 2 vols cargo sont hors
+  analyse), **139 rentables / 44 déficitaires**, un taux global de rentabilité
+  (**76 %**), la marge moyenne (**+4,8 %**), le profit net.
+- **À dire** : « C'est la photo d'ensemble. Le réseau est réaliste : environ deux
+  tiers de lignes rentables et un tiers de lignes à l'équilibre ou déficitaires. »
 
 ### Étape 2 — Vols (données brutes)
 
-- La table liste **178 vols** (séries hebdomadaires par route).
+- La table liste **185 vols** (séries hebdomadaires par route).
 - On peut **trier** les colonnes, **calculer** le coût d'un vol (icône 🧮),
   **importer** un Excel, **créer/modifier/supprimer**.
 - **À dire** : « Chaque ligne = un vol réel. Un même numéro revient chaque semaine
@@ -124,7 +124,7 @@ Ouvrir http://localhost:5173 et se connecter (`admin` / `admin123`).
 
 ### Étape 3 — Flotte & Aéroports (données de référence)
 
-- 7 avions (leur coût horaire/vol), 25 aéroports (codes IATA + redevances).
+- 7 avions (leur coût **par heure de vol**), 27 aéroports (codes IATA + redevances).
 - Les aéroports sont liés aux vols par **clé étrangère**.
 
 ### Étape 4 — Scénarios (le laboratoire)
@@ -165,15 +165,17 @@ Trois sous-outils :
 
 | Indicateur | Valeur attendue |
 | --- | --- |
-| Vols totaux | 178 (176 calculés + 2 cargo) |
-| Vols rentables | ~82 |
-| Vols déficitaires | ~94 |
-| Taux de rentabilité | ~47 % |
+| Vols totaux | 185 (183 calculés + 2 cargo) |
+| Vols rentables | 139 |
+| Vols déficitaires | 44 |
+| Taux de rentabilité | 76 % |
+| Marge moyenne | +4,8 % |
+| Résultat cumulé | ≈ 3,13 M MAD |
 | Avions | 7 |
-| Aéroports | 25 |
+| Aéroports | 27 |
 | Scénarios prédéfinis | 7 |
-| Meilleure route | AT-200 (CMN → JFK), marge ~+80 % |
-| Pire route | AT-866 (CMN → BCN), marge ~-80 % |
+| Meilleure route | AT-780 (CMN → CDG), marge +24,5 % |
+| Pire route | AT-866 (CMN → BCN), marge −18,6 % |
 
 **Messages clés :**
 - Il existe une **forte dispersion** : certaines routes sont très rentables, d'autres
@@ -249,7 +251,7 @@ flowchart TB
 - **Déterminisme** : Monte Carlo fixe la graine (`random.seed(42)`) → résultats
   reproductibles (idéal pour une démo/soutenance).
 - **Base auto-initialisée** : `database.py` crée les tables puis `seed_data.py`
-  génère les données de démo (178 vols, 7 avions, 25 aéroports) au premier lancement.
+  génère les données de démo (185 vols, 7 avions, 27 aéroports) au premier lancement.
 
 ---
 
@@ -318,10 +320,11 @@ erDiagram
         text model
         int capacity
         real fuel_consumption_per_hour
-        real maintenance_cost_per_flight
-        real amortization_cost_per_flight
-        real crew_cost_per_flight
-        real insurance_cost_per_flight
+        real maintenance_cost_per_hour
+        real amortization_cost_per_hour
+        real crew_cost_per_hour
+        real insurance_cost_per_hour
+        real range_km
     }
     airports {
         bigint id PK
@@ -401,8 +404,11 @@ flowchart LR
 ### Coût d'un vol (`services/cost.py`)
 
 ```
-Coûts fixes      = amortissement + équipage + assurance
+Cadences avion   = MAD par heure de vol (amortissement, équipage, maintenance, assurance)
+
+Coûts fixes      = (amortissement + équipage + assurance) × durée(h)
 Carburant        = consommation(L/h) × durée(h) × prix(L)
+Maintenance      = maintenance(MAD/h) × durée(h)
 Coûts variables  = carburant + maintenance + catering×pax + handling + taxes
 
 total_cost  = fixes + variables

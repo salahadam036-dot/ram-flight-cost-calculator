@@ -34,8 +34,9 @@ Pages : Tableau de Bord | Vols | Flotte | Aeroports | Scenarios | Prevision | Ri
 Roles : "admin" (acces complet) et "analyst".
 
 Regles de calcul appliquees par l'application :
-- couts fixes = amortissement + equipage + assurance de l'avion
-- couts variables = carburant (consommation horaire x duree x prix du litre) + maintenance + catering (par passager) + handling + taxes d'aeroport
+- les couts d'exploitation de l'appareil (amortissement, equipage, assurance, maintenance) sont exprimes par heure de vol et multiplies par la duree du vol
+- couts fixes = (amortissement + equipage + assurance de l'avion) x duree du vol
+- couts variables = carburant (consommation horaire x duree x prix du litre) + maintenance (cout horaire x duree) + catering (par passager) + handling + taxes d'aeroport
 - cout total = couts fixes + couts variables
 - revenu = prix moyen du billet x nombre de passagers
 - marge (%) = (revenu - cout total) / cout total x 100
@@ -58,24 +59,24 @@ def _guide() -> str:
 
 def _flotte(conn) -> str:
     lignes = conn.execute(
-        "SELECT model, type, capacity, fuel_consumption_per_hour, maintenance_cost_per_flight, "
-        "amortization_cost_per_flight, crew_cost_per_flight, insurance_cost_per_flight "
+        "SELECT model, type, capacity, fuel_consumption_per_hour, maintenance_cost_per_hour, "
+        "amortization_cost_per_hour, crew_cost_per_hour, insurance_cost_per_hour "
         "FROM aircraft ORDER BY capacity DESC"
     ).fetchall()
-    sortie = ["FLOTTE (%d avions). Couts en MAD, par vol" % len(lignes)]
+    sortie = ["FLOTTE (%d avions). Couts en MAD, par heure de vol" % len(lignes)]
     for r in lignes:
         sortie.append(
-            "- %s (%s) : %d sieges, carburant %s L/h, maintenance %s, amortissement %s, "
-            "equipage %s, assurance %s"
+            "- %s (%s) : %d sieges, carburant %s L/h, maintenance %s/h, amortissement %s/h, "
+            "equipage %s/h, assurance %s/h"
             % (
                 r["model"],
                 r["type"],
                 r["capacity"],
                 _montant(r["fuel_consumption_per_hour"]),
-                _montant(r["maintenance_cost_per_flight"]),
-                _montant(r["amortization_cost_per_flight"]),
-                _montant(r["crew_cost_per_flight"]),
-                _montant(r["insurance_cost_per_flight"]),
+                _montant(r["maintenance_cost_per_hour"]),
+                _montant(r["amortization_cost_per_hour"]),
+                _montant(r["crew_cost_per_hour"]),
+                _montant(r["insurance_cost_per_hour"]),
             )
         )
     return "\n".join(sortie)
@@ -189,8 +190,9 @@ def _extreme(conn, ordre: str) -> dict | None:
 def _indicateurs(stats: dict, conn) -> str:
     """Chiffres globaux.
 
-    Les extremes sont donnes explicitement : le modele ne sait pas comparer 178
-    lignes de vol de facon fiable, mieux vaut lui fournir la reponse toute faite.
+    Les extremes sont donnes explicitement : le modele ne sait pas comparer des
+    centaines de lignes de vol de facon fiable, mieux vaut lui fournir la reponse
+    toute faite.
     """
     total_enregistres = conn.execute("SELECT COUNT(*) AS n FROM flights").fetchone()["n"]
     total_calcules = stats.get("total_flights", 0)

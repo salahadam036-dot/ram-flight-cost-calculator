@@ -76,10 +76,11 @@ erDiagram
         text model
         int capacity
         real fuel_consumption_per_hour
-        real maintenance_cost_per_flight
-        real amortization_cost_per_flight
-        real crew_cost_per_flight
-        real insurance_cost_per_flight
+        real maintenance_cost_per_hour
+        real amortization_cost_per_hour
+        real crew_cost_per_hour
+        real insurance_cost_per_hour
+        real range_km
     }
     airports {
         bigint id PK
@@ -141,15 +142,15 @@ erDiagram
 
 Le calcul (`services/cost.py` → `compute_cost`) sépare les coûts en deux familles :
 
-**Coûts fixes** (indépendants du remplissage) :
+**Coûts fixes** (indépendants du remplissage, proportionnels aux heures de vol) :
 ```
-fixed = amortissement + équipage + assurance
+fixed = (amortissement/h + équipage/h + assurance/h) × durée_h
 ```
 
 **Coûts variables** (dépendent du vol et du remplissage) :
 ```
 fuel_cost = consommation_L/h × durée_h × prix_carburant/L
-variable = fuel_cost + maintenance + (catering/pax × passagers) + handling + taxes
+variable = fuel_cost + (maintenance/h × durée_h) + (catering/pax × passagers) + handling + taxes
 ```
 
 **Résultats** :

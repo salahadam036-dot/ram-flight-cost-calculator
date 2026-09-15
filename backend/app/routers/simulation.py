@@ -34,7 +34,7 @@ PRESETS: list[SimulationPreset] = [
     ),
     SimulationPreset(
         key="demand-boom", name="Pic de demande",
-        description="Remplissage à 100 % + hausse du prix des billets de 15 %.",
+        description="Remplissage +30 points et hausse du prix des billets de 15 %.",
         icon="trending-up", fuel_variation_pct=0, load_factor_variation_pct=30,
         ticket_price_variation_pct=15, extra_tax=0,
     ),

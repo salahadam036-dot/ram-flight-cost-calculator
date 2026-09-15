@@ -2,15 +2,22 @@ from app.database import get_connection
 
 
 def compute_cost(flight: dict, aircraft: dict) -> dict:
-    """Calcule les couts fixes, variables et la rentabilite d'un vol."""
-    amort = aircraft["amortization_cost_per_flight"]
-    crew = aircraft["crew_cost_per_flight"]
-    insur = aircraft["insurance_cost_per_flight"]
+    """Calcule les couts fixes, variables et la rentabilite d'un vol.
+
+    Les couts d'exploitation de l'appareil (amortissement, equipage, assurance,
+    maintenance) sont exprimes par heure de vol : ils sont donc multiplies par
+    la duree du vol. Un vol de 8 heures immobilise l'appareil et son equipage
+    huit fois plus longtemps qu'un vol d'une heure.
+    """
+    hours = flight["duration_hours"]
+    amort = aircraft["amortization_cost_per_hour"] * hours
+    crew = aircraft["crew_cost_per_hour"] * hours
+    insur = aircraft["insurance_cost_per_hour"] * hours
     fixed = amort + crew + insur
 
-    fuel_liters = aircraft["fuel_consumption_per_hour"] * flight["duration_hours"]
+    fuel_liters = aircraft["fuel_consumption_per_hour"] * hours
     fuel_cost = fuel_liters * flight["fuel_price_per_liter"]
-    maint = aircraft["maintenance_cost_per_flight"]
+    maint = aircraft["maintenance_cost_per_hour"] * hours
     catering = flight["catering_cost_per_pax"] * flight["passengers"]
     handling = flight["handling_cost"]
     taxes = flight["taxes_airport"]
@@ -133,24 +140,25 @@ def get_cost_result(flight_id: int) -> dict | None:
 def simulate(flight: dict, aircraft: dict, fuel_variation_pct=0.0,
              load_factor_variation_pct=0.0, ticket_price_variation_pct=0.0,
              extra_tax=0.0, scenario_name="Simulation") -> dict:
+    hours = flight["duration_hours"]
     nfp = flight["fuel_price_per_liter"] * (1 + fuel_variation_pct / 100)
     base_load = flight["passengers"] / aircraft["capacity"]
     nl = max(0.01, min(1.0, base_load + load_factor_variation_pct / 100))
     np_ = max(1, int(aircraft["capacity"] * nl))
     ntp = flight["ticket_price_avg"] * (1 + ticket_price_variation_pct / 100)
 
-    fuel_liters = aircraft["fuel_consumption_per_hour"] * flight["duration_hours"]
+    fuel_liters = aircraft["fuel_consumption_per_hour"] * hours
     fuel_cost = fuel_liters * nfp
-    maint = aircraft["maintenance_cost_per_flight"]
+    maint = aircraft["maintenance_cost_per_hour"] * hours
     catering = flight["catering_cost_per_pax"] * np_
     handling = flight["handling_cost"]
     taxes = flight["taxes_airport"] + extra_tax
     variable = fuel_cost + maint + catering + handling + taxes
     fixed = (
-        aircraft["amortization_cost_per_flight"]
-        + aircraft["crew_cost_per_flight"]
-        + aircraft["insurance_cost_per_flight"]
-    )
+        aircraft["amortization_cost_per_hour"]
+        + aircraft["crew_cost_per_hour"]
+        + aircraft["insurance_cost_per_hour"]
+    ) * hours
     total = fixed + variable
     revenue = ntp * np_
     margin = (revenue - total) / total * 100 if total > 0 else 0

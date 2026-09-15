@@ -521,7 +521,7 @@ function MonteCarloTab({ flights, flightId, onFlightChange }: { flights: Flight[
 
 function OptimizeTab({ flights, flightId, onFlightChange }: { flights: Flight[]; flightId: string; onFlightChange: (v: string) => void }) {
   const [tMin, setTMin] = useState("500");
-  const [tMax, setTMax] = useState("5000");
+  const [tMax, setTMax] = useState("8000");
   const [tStep, setTStep] = useState("100");
   const [opt, setOpt] = useState<OptimizationResult | null>(null);
   const [loading, setLoading] = useState(false);

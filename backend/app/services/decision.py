@@ -97,12 +97,12 @@ def monte_carlo(flight_id: int, n_sims=5000, fuel_std_pct=10.0,
 
     fuel_liters = aircraft["fuel_consumption_per_hour"] * flight["duration_hours"]
     fuel_cost = fuel_liters * fuel_price
-    variable = (fuel_cost + aircraft["maintenance_cost_per_flight"]
+    variable = (fuel_cost + aircraft["maintenance_cost_per_hour"] * flight["duration_hours"]
                 + flight["catering_cost_per_pax"] * pax
                 + flight["handling_cost"] + flight["taxes_airport"])
-    fixed = (aircraft["amortization_cost_per_flight"]
-             + aircraft["crew_cost_per_flight"]
-             + aircraft["insurance_cost_per_flight"])
+    fixed = ((aircraft["amortization_cost_per_hour"]
+              + aircraft["crew_cost_per_hour"]
+              + aircraft["insurance_cost_per_hour"]) * flight["duration_hours"])
     total_cost = fixed + variable
     revenue = ticket * pax
     profits = revenue - total_cost
@@ -152,7 +152,7 @@ def monte_carlo(flight_id: int, n_sims=5000, fuel_std_pct=10.0,
     }
 
 
-def optimize(flight_id: int, ticket_min=500, ticket_max=5000, ticket_step=100) -> dict:
+def optimize(flight_id: int, ticket_min=500, ticket_max=8000, ticket_step=100) -> dict:
     flight, base_aircraft = get_flight_and_aircraft(flight_id)
     if flight is None:
         raise ValueError(f"Vol ID={flight_id} introuvable.")
@@ -169,31 +169,64 @@ def optimize(flight_id: int, ticket_min=500, ticket_max=5000, ticket_step=100) -
     rows = conn.execute("SELECT * FROM aircraft ORDER BY model").fetchall()
     conn.close()
 
+    # L'optimisation compare des appareils de la meme categorie operationnelle
+    # que l'avion affecte au vol : c'est ainsi qu'une decision de reaffectation
+    # se pose en pratique, un changement de categorie relevant d'un arbitrage
+    # strategique et non du calcul de rentabilite d'une rotation. Deux
+    # garde-fous s'y ajoutent : un avion dont le rayon d'action est inferieur a
+    # la distance du vol ne peut pas desservir la liaison, et un rayon nul
+    # (donnee non renseignee) n'exclut pas l'appareil.
+    distance = flight["distance_km"]
+    category = base_aircraft["type"]
+    rows = [
+        r for r in rows
+        if r["type"] == category and (not r["range_km"] or r["range_km"] >= distance)
+    ]
+    if not rows:
+        raise ValueError(
+            "Aucun appareil de la categorie de l'avion affecte ne peut desservir "
+            "cette liaison."
+        )
+
     # Evaluation vectorisee (numpy) : grille de prix (P) x flotte (A).
     prices = np.arange(ticket_min, ticket_max + ticket_step, ticket_step, dtype=float)
     capacities = np.asarray([r["capacity"] for r in rows], dtype=float)
     fuel_cons = np.asarray([r["fuel_consumption_per_hour"] for r in rows], dtype=float)
-    maint = np.asarray([r["maintenance_cost_per_flight"] for r in rows], dtype=float)
-    amort = np.asarray([r["amortization_cost_per_flight"] for r in rows], dtype=float)
-    crew = np.asarray([r["crew_cost_per_flight"] for r in rows], dtype=float)
-    insur = np.asarray([r["insurance_cost_per_flight"] for r in rows], dtype=float)
+    maint = np.asarray([r["maintenance_cost_per_hour"] for r in rows], dtype=float)
+    amort = np.asarray([r["amortization_cost_per_hour"] for r in rows], dtype=float)
+    crew = np.asarray([r["crew_cost_per_hour"] for r in rows], dtype=float)
+    insur = np.asarray([r["insurance_cost_per_hour"] for r in rows], dtype=float)
 
-    base_price = flight["ticket_price_avg"] if flight["ticket_price_avg"] > 0 else 1
-    base_load = flight["passengers"] / base_aircraft["capacity"]
+    base_price = flight["ticket_price_avg"] if flight["ticket_price_avg"] > 0 else 1.0
+    base_pax = flight["passengers"]
+    # Elasticite-prix de la demande au point d'exploitation observe du vol.
     elasticity = -0.5
-    price_ratio = prices / base_price
 
-    # Demande a elasticite constante, bornee comme avant (10 % - 100 %).
-    load = np.clip(base_load * price_ratio ** elasticity, 0.1, 1.0)
-    pax = np.floor(capacities[:, None] * load[None, :]).astype(int)
+    # La demande est celle du marche : elle ne depend que du prix, et non de
+    # l'appareil affecte. La courbe est lineaire, de pente negative, calee sur
+    # le point d'exploitation observe (prix moyen du billet, passagers
+    # transportes). La forme lineaire est essentielle a deux titres : une
+    # elasticite constante d'un module inferieur a 1 rendrait le revenu
+    # strictement croissant avec le prix, et l'optimum se situerait donc
+    # toujours a la borne haute de la grille ; et une demande rattachee a
+    # l'appareil ferait croitre le nombre de passagers avec la capacite, ce qui
+    # reviendrait a supposer qu'un long-courrier cree a lui seul la demande sur
+    # une liaison regionale.
+    slope_pax = elasticity * base_pax / base_price
+    demand = np.maximum(1.0, base_pax + slope_pax * (prices - base_price))
+
+    # Chaque appareil ne transporte que ce que le marche demande, plafonne par
+    # sa propre capacite.
+    pax = np.minimum(capacities[:, None], np.floor(demand)[None, :]).astype(int)
     pax = np.clip(pax, 1, capacities[:, None].astype(int))
 
-    fuel_liters = fuel_cons * flight["duration_hours"]
+    hours = flight["duration_hours"]
+    fuel_liters = fuel_cons * hours
     fuel_cost = fuel_liters[:, None] * flight["fuel_price_per_liter"]
-    variable = (fuel_cost + maint[:, None]
+    variable = (fuel_cost + maint[:, None] * hours
                 + flight["catering_cost_per_pax"] * pax
                 + flight["handling_cost"] + flight["taxes_airport"])
-    fixed = amort + crew + insur
+    fixed = (amort + crew + insur) * hours
     total = fixed[:, None] + variable
     revenue = prices[None, :] * pax
     profit = revenue - total

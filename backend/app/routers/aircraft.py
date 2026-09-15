@@ -14,10 +14,11 @@ def _to_dict(r) -> dict:
         "model": r["model"],
         "capacity": r["capacity"],
         "fuel_consumption_per_hour": r["fuel_consumption_per_hour"],
-        "maintenance_cost_per_flight": r["maintenance_cost_per_flight"],
-        "amortization_cost_per_flight": r["amortization_cost_per_flight"],
-        "crew_cost_per_flight": r["crew_cost_per_flight"],
-        "insurance_cost_per_flight": r["insurance_cost_per_flight"],
+        "maintenance_cost_per_hour": r["maintenance_cost_per_hour"],
+        "amortization_cost_per_hour": r["amortization_cost_per_hour"],
+        "crew_cost_per_hour": r["crew_cost_per_hour"],
+        "insurance_cost_per_hour": r["insurance_cost_per_hour"],
+        "range_km": r["range_km"],
     }
 
 
@@ -37,12 +38,13 @@ def create_aircraft(body: AircraftCreate, _=Depends(get_current_user)):
     try:
         cur = conn.execute(
             "INSERT INTO aircraft (type, model, capacity, fuel_consumption_per_hour, "
-            "maintenance_cost_per_flight, amortization_cost_per_flight, crew_cost_per_flight, "
-            "insurance_cost_per_flight) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            "maintenance_cost_per_hour, amortization_cost_per_hour, crew_cost_per_hour, "
+            "insurance_cost_per_hour, range_km) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "RETURNING id",
             (
                 body.type, body.model, body.capacity, body.fuel_consumption_per_hour,
-                body.maintenance_cost_per_flight, body.amortization_cost_per_flight,
-                body.crew_cost_per_flight, body.insurance_cost_per_flight,
+                body.maintenance_cost_per_hour, body.amortization_cost_per_hour,
+                body.crew_cost_per_hour, body.insurance_cost_per_hour, body.range_km,
             ),
         )
         new_id = cur.fetchone()["id"]
@@ -62,12 +64,13 @@ def update_aircraft(aircraft_id: int, body: AircraftUpdate, _=Depends(get_curren
             raise HTTPException(404, "Avion introuvable")
         conn.execute(
             "UPDATE aircraft SET type=%s, model=%s, capacity=%s, fuel_consumption_per_hour=%s, "
-            "maintenance_cost_per_flight=%s, amortization_cost_per_flight=%s, crew_cost_per_flight=%s, "
-            "insurance_cost_per_flight=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s",
+            "maintenance_cost_per_hour=%s, amortization_cost_per_hour=%s, crew_cost_per_hour=%s, "
+            "insurance_cost_per_hour=%s, range_km=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s",
             (
                 body.type, body.model, body.capacity, body.fuel_consumption_per_hour,
-                body.maintenance_cost_per_flight, body.amortization_cost_per_flight,
-                body.crew_cost_per_flight, body.insurance_cost_per_flight, aircraft_id,
+                body.maintenance_cost_per_hour, body.amortization_cost_per_hour,
+                body.crew_cost_per_hour, body.insurance_cost_per_hour, body.range_km,
+                aircraft_id,
             ),
         )
         conn.commit()

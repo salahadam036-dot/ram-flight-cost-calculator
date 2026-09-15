@@ -41,10 +41,11 @@ class AircraftBase(BaseModel):
     model: str
     capacity: int
     fuel_consumption_per_hour: float
-    maintenance_cost_per_flight: float
-    amortization_cost_per_flight: float
-    crew_cost_per_flight: float
-    insurance_cost_per_flight: float
+    maintenance_cost_per_hour: float
+    amortization_cost_per_hour: float
+    crew_cost_per_hour: float
+    insurance_cost_per_hour: float
+    range_km: float = 0
 
 
 class AircraftCreate(AircraftBase):
@@ -304,7 +305,7 @@ class MonteCarloOut(BaseModel):
 class OptimizationRequest(BaseModel):
     flight_id: int
     ticket_min: int = 500
-    ticket_max: int = 5000
+    ticket_max: int = 8000
     ticket_step: int = 100
 
 

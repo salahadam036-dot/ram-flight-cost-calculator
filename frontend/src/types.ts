@@ -11,10 +11,11 @@ export interface Aircraft {
   model: string;
   capacity: number;
   fuel_consumption_per_hour: number;
-  maintenance_cost_per_flight: number;
-  amortization_cost_per_flight: number;
-  crew_cost_per_flight: number;
-  insurance_cost_per_flight: number;
+  maintenance_cost_per_hour: number;
+  amortization_cost_per_hour: number;
+  crew_cost_per_hour: number;
+  insurance_cost_per_hour: number;
+  range_km: number;
 }
 
 export interface Airport {

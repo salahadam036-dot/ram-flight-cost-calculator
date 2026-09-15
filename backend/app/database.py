@@ -16,10 +16,11 @@ SCHEMA_STATEMENTS = [
         id BIGSERIAL PRIMARY KEY,
         type TEXT NOT NULL, model TEXT NOT NULL, capacity INTEGER NOT NULL,
         fuel_consumption_per_hour REAL NOT NULL,
-        maintenance_cost_per_flight REAL NOT NULL,
-        amortization_cost_per_flight REAL NOT NULL,
-        crew_cost_per_flight REAL NOT NULL,
-        insurance_cost_per_flight REAL NOT NULL,
+        maintenance_cost_per_hour REAL NOT NULL,
+        amortization_cost_per_hour REAL NOT NULL,
+        crew_cost_per_hour REAL NOT NULL,
+        insurance_cost_per_hour REAL NOT NULL,
+        range_km REAL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""",
     """CREATE TABLE IF NOT EXISTS airports (
@@ -100,6 +101,33 @@ MIGRATION_STATEMENTS = [
        ADD COLUMN IF NOT EXISTS simulated_ticket_price REAL""",
     """ALTER TABLE simulations
        ADD COLUMN IF NOT EXISTS break_even_passengers INTEGER""",
+    """ALTER TABLE aircraft
+       ADD COLUMN IF NOT EXISTS range_km REAL DEFAULT 0""",
+]
+
+# Le poste "cout d'exploitation de l'appareil" etait historiquement stocke par
+# vol ; il est desormais stocke par HEURE DE VOL et multiplie par la duree du
+# vol dans compute_cost(). Les bases existantes sont renommees ici (operation
+# idempotente) : les libelles suivent la nouvelle semantique.
+_AIRCRAFT_RENAMES = [
+    ("maintenance_cost_per_flight", "maintenance_cost_per_hour"),
+    ("amortization_cost_per_flight", "amortization_cost_per_hour"),
+    ("crew_cost_per_flight", "crew_cost_per_hour"),
+    ("insurance_cost_per_flight", "insurance_cost_per_hour"),
+]
+
+RENAME_STATEMENTS = [
+    f"""DO $$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name='aircraft' AND column_name='{old}')
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name='aircraft' AND column_name='{new}')
+          THEN
+            ALTER TABLE aircraft RENAME COLUMN {old} TO {new};
+          END IF;
+        END $$"""
+    for old, new in _AIRCRAFT_RENAMES
 ]
 
 
@@ -113,6 +141,8 @@ def initialize_database() -> None:
             for stmt in FK_STATEMENTS:
                 cur.execute(stmt)
             for stmt in MIGRATION_STATEMENTS:
+                cur.execute(stmt)
+            for stmt in RENAME_STATEMENTS:
                 cur.execute(stmt)
         conn.commit()
     finally:
@@ -174,7 +204,7 @@ def _seed_demo_simulations(flight_ids: list, demo_flights: list) -> None:
 
     demo_scenarios = [
         ("Krach du carburant", -40.0, 0.0, 0.0, 0.0),
-        ("Sous-remplissage", 0.0, -35.0, 0.0, 0.0),
+        ("Sous-remplissage", 0.0, -40.0, 0.0, 0.0),
         ("Choc pétrolier", 50.0, 0.0, 0.0, 0.0),
         ("Pic de demande", 0.0, 30.0, 15.0, 0.0),
         ("Guerre des prix", 0.0, 5.0, -25.0, 0.0),
@@ -205,8 +235,8 @@ def _seed_if_empty() -> None:
         if cur.execute("SELECT COUNT(*) FROM aircraft").fetchone()["count"] == 0:
             cur.executemany(
                 "INSERT INTO aircraft (type, model, capacity, fuel_consumption_per_hour, "
-                "maintenance_cost_per_flight, amortization_cost_per_flight, crew_cost_per_flight, "
-                "insurance_cost_per_flight) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                "maintenance_cost_per_hour, amortization_cost_per_hour, crew_cost_per_hour, "
+                "insurance_cost_per_hour, range_km) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 DEMO_AIRCRAFT,
             )
 

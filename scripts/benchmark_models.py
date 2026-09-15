@@ -40,9 +40,10 @@ COMMANDE_CONTEXTE = [
 
 # (modele, taille de fenetre). num_predict=1024 partout, comme l'application.
 CONFIGURATIONS = [
-    ("llama3.2:latest", 16384),   # configuration actuelle de l'application
+    ("llama3.2:latest", 16384),   # modele precedent (3B) : reference de comparaison
     ("llama3.1:8b", 16384),
     ("llama3.1:8b", 12288),
+    ("llama3.1:8b", 10240),       # configuration actuelle de l'application
     ("llama3.1:8b", 8192),
 ]
 
@@ -52,31 +53,40 @@ TIMEOUT = 900
 
 # Questions dont la reponse exacte est connue dans la base de demonstration.
 # Chaque question passe si tous ses groupes de controle trouvent une correspondance.
+#
+# ATTENTION : ces valeurs attendues sont liees au jeu de donnees de demonstration
+# (backend/app/seed_data.py). Toute recalibration du jeu les invalide : il faut
+# alors relire build_app_context() et mettre a jour les valeurs ci-dessous avant
+# de rejouer le banc d'essai.
 QUESTIONS = [
     {
         "question": "Combien de vols sont enregistrés dans la base, et combien sont déficitaires ?",
-        "attendu": "178 vols enregistrés, 94 déficitaires",
-        "controles": [["178"], ["94"]],
+        "attendu": "185 vols enregistrés, 44 déficitaires",
+        "controles": [["185"], ["44"]],
     },
     {
         "question": "Quel vol a la marge la plus faible ? Donne son numéro, sa route et sa marge.",
-        "attendu": "AT-866 (CMN-BCN), marge -79,6 %",
-        "controles": [["at-866", "at866"], ["79.6"]],
+        "attendu": "AT-866 (CMN-BCN), marge -18,6 %",
+        "controles": [["at-866", "at866"], ["18.6"]],
     },
     {
         "question": "Quel avion a la marge moyenne la plus élevée, et quelle est cette marge ?",
-        "attendu": "Boeing 787-9, marge moyenne 30,6 %",
-        "controles": [["787-9"], ["30.6"]],
+        "attendu": "Embraer E190, marge moyenne 8,1 %",
+        "controles": [["e190"], ["8.1"]],
     },
     {
         "question": "Quel est le coût par passager moyen du Boeing 787-9 ?",
-        "attendu": "2235 MAD par passager",
-        "controles": [["2235", "2 235"]],
+        "attendu": "3810 MAD par passager",
+        "controles": [["3810", "3 810"]],
     },
     {
         "question": "Quel est le coût par passager moyen de l'ATR 72-600 ?",
-        "attendu": "693 MAD par passager",
-        "controles": [["693"]],
+        # La valeur brute "737" ne suffit pas comme controle : elle apparait deja
+        # dans le contexte sous la forme des appareils "Boeing 737-800" et
+        # "Boeing 737 MAX 8", ce qui ferait passer la question sans que le modele
+        # ait trouve le cout par passager. On exige donc la devise.
+        "attendu": "737 MAD par passager",
+        "controles": [["737 mad", "737mad", "737 dirhams"]],
     },
 ]
 
@@ -86,9 +96,23 @@ def normaliser(texte: str) -> str:
 
 
 def evaluer(reponse: str, controles) -> bool:
+    """Vrai si chaque groupe de controle trouve une correspondance.
+
+    La correspondance est ancree sur les limites de nombre : un controle comme
+    "44" ne doit pas etre satisfait par "1 344" ni par "440", qui sont d'autres
+    valeurs. Sans cette precaution, un contexte riche en chiffres (distances,
+    montants, capacites) provoque des faux positifs -- et donc des scores
+    gonfles, ce qui est exactement ce qu'un banc d'essai doit eviter.
+    """
     texte = normaliser(reponse)
     return all(
-        any(alternative.lower() in texte for alternative in groupe) for groupe in controles
+        any(
+            re.search(
+                r"(?<![\d.,])" + re.escape(normaliser(alternative)) + r"(?!\d)", texte
+            )
+            for alternative in groupe
+        )
+        for groupe in controles
     )
 
 

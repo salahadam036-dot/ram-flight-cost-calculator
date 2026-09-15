@@ -17,7 +17,8 @@ et leur rentabilité.
 
 Pour chaque vol, le système distingue :
 
-- **Coûts fixes** : amortissement de l'avion, équipage, assurance.
+- **Coûts fixes** : amortissement de l'avion, équipage, assurance — proportionnels
+  aux heures de vol.
 - **Coûts variables** : carburant, maintenance, restauration, handling, taxes.
 
 Il en déduit le coût total, le revenu (prix du billet × passagers), le coût par

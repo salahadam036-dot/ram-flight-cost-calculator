@@ -14,10 +14,11 @@ Gérer les **caractéristiques techniques et économiques** des avions de la flo
 
 - **Capacité** (nombre de sièges).
 - **Consommation de carburant** (litres par heure).
-- **Coût de maintenance** par vol.
-- **Coût d'amortissement** par vol.
-- **Coût d'équipage** par vol.
-- **Coût d'assurance** par vol.
+- **Coût de maintenance** par heure de vol.
+- **Coût d'amortissement** par heure de vol.
+- **Coût d'équipage** par heure de vol.
+- **Coût d'assurance** par heure de vol.
+- **Rayon d'action** (km) — conditionne l'affectation de l'appareil à une liaison.
 
 ## À quoi cela sert
 
