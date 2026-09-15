@@ -30,6 +30,10 @@ desktop/release/
 desktop/*.zip
 desktop/*.tar
 
+# Installeurs generes par build-exe.ps1 (~80 Mo chacun). Ils se regenerent a
+# volonte : les versionner ferait grossir le depot de 80 Mo par construction.
+dist-exe/
+
 # OS / editor
 .DS_Store
 *.log
