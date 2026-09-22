@@ -32,9 +32,10 @@ centrée sur l'analyse du coût et de la rentabilité des vols.
 | Sujet | Rôle |
 | --- | --- |
 | [Architecture & modèle de données](architecture.md) | API, tables, formule de coût, correspondance onglet ↔ route |
+| [Algorithmes](algorithmes.md) | Analyse détaillée de chaque algorithme : formules, complexité, hypothèses et limites |
 | [Sécurité & authentification](securite.md) | JWT, bcrypt, rôles, clés secrètes |
 | [Chatbot IA](chatbot.md) | Assistant intégré (Ollama / llama3.1:8b) |
-| [Performance de l'assistant IA](ollama-performance.md) | Diagnostic de latence et déploiement sur GPU (RTX 4090) |
+| [Performance de l'assistant IA](ollama-performance.md) | Diagnostic de latence et déploiement sur GPU |
 | [Comparaison des modèles d'IA](rapport-benchmark-modeles.md) | Banc d'essai llama3.2 / llama3.1:8b : exactitude, vitesse, mémoire et recommandation |
 | [Import Excel](import-excel.md) | Format du fichier et correspondance des avions |
 

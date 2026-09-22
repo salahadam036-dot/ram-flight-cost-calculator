@@ -1,5 +1,9 @@
 # TODO — agent sur la machine RTX
 
+> **Statut : terminé.** La campagne a été rejouée sur le jeu de données recalibré
+> et `docs/rapport-benchmark-modeles.md` a été mis à jour. Ce document est conservé
+> comme trace du protocole de re-mesure.
+
 **Objectif** : rejouer le banc d'essai des modèles sur la machine GPU, puis
 mettre à jour `docs/rapport-benchmark-modeles.md` avec les chiffres réellement
 mesurés, et pousser le résultat.

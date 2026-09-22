@@ -12,18 +12,25 @@ dépendent d'une seule chose : **Ollama parvient-il à utiliser un GPU ?**
 
 | | Sans GPU (CPU seul) | Avec GPU |
 | --- | --- | --- |
-| Vitesse de génération | ~2 jetons/s | ~150 jetons/s |
+| Vitesse de génération | ~2 jetons/s | 36 à 64 jetons/s selon le modèle et la fenêtre |
 | Réponse à un simple « bonjour » | 7 à 20 s | < 1 s |
 | Processeur vu par Ollama | `100% CPU` | `100% GPU` |
 
 Aucune ligne de code n'est à changer pour passer de l'un à l'autre : seul
 l'environnement d'exécution d'Ollama change.
 
+Le modèle actuellement retenu est **`llama3.1:8b`**, avec une fenêtre de
+`10240` jetons. Le choix entre ce modèle et le précédent (`llama3.2`, 3 B) ne
+repose pas sur des ordres de grandeur mais sur des mesures : voir le
+[rapport de comparaison des modèles](rapport-benchmark-modeles.md).
+
 ## 2. Ce qui a été mesuré
 
 Environnement du relevé : Apple M4 Max (14 cœurs, 36 Go de RAM), Ollama exécuté
-dans le conteneur Docker `ram-ollama`, modèle `llama3.2` (3,2 B, quantification
-`Q4_K_M`, 2,9 Go).
+dans le conteneur Docker `ram-ollama`. Le relevé a été fait avec le modèle alors
+en place, `llama3.2` (3 B, quantification `Q4_K_M`, 2,9 Go). Le modèle retenu
+aujourd'hui est `llama3.1:8b`, plus lourd (≈ 4,9 Go) et donc plus exigeant : il
+ne fait qu'accentuer l'écart entre CPU et GPU décrit ci-dessous.
 
 | Mesure | Valeur relevée | Valeur attendue sur GPU |
 | --- | --- | --- |
@@ -157,7 +164,7 @@ Ces réglages suppriment la pénalité de rechargement (~6 s), mais **ils ne
 corrigent pas le coût par requête** tant qu'Ollama reste sur CPU. Le vrai
 correctif est le GPU : voir la section suivante.
 
-## 5. Déployer avec un GPU (RTX 4090)
+## 5. Déployer avec un GPU
 
 C'est la partie à suivre sur la machine équipée du GPU.
 
@@ -179,7 +186,7 @@ Vérifiez que Docker voit bien le GPU :
 docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
 ```
 
-Si cette commande affiche la RTX 4090, tout est en place.
+Si cette commande affiche votre carte, tout est en place.
 
 ### 5.2 Lancer la stack avec le GPU
 
@@ -204,7 +211,7 @@ Vous devez voir `100% GPU` dans la colonne `PROCESSOR` :
 
 ```
 NAME               ID              SIZE      PROCESSOR    CONTEXT    UNTIL
-llama3.2:latest    a80c4f17acd5    3.1 GB    100% GPU     4096       29 minutes from now
+llama3.1:8b        46e0c10c039e    4.9 GB    100% GPU     10240      29 minutes from now
 ```
 
 Si la colonne affiche `100% CPU`, le GPU n'est **pas** utilisé : voir la
@@ -216,15 +223,18 @@ Deuxième vérification, côté API — `size_vram` doit être non nul :
 curl -s http://localhost:11434/api/ps
 ```
 
+La valeur dépend du modèle **et** de la fenêtre (`num_ctx`) : elle croît avec
+elle. À 10 240 jetons, le modèle retenu en occupe environ 6,1 Go.
+
 ```json
-{"models":[{"name":"llama3.2:latest","size_vram":3091658560, ...}]}
+{"models":[{"name":"llama3.1:8b","size_vram":6083000000, ...}]}
 ```
 
 ### 5.4 Mesurer la latence
 
 ```bash
 curl -sS -w '\n--- total: %{time_total}s\n' http://localhost:11434/api/chat \
-  -d '{"model":"llama3.2","stream":false,"messages":[{"role":"user","content":"hi"}]}'
+  -d '{"model":"llama3.1:8b","stream":false,"messages":[{"role":"user","content":"hi"}]}'
 ```
 
 Le champ `eval_duration` (en nanosecondes) et `eval_count` donnent la vitesse :
@@ -233,36 +243,41 @@ Le champ `eval_duration` (en nanosecondes) et `eval_count` donnent la vitesse :
 jetons/s = eval_count / (eval_duration / 1e9)
 ```
 
-Sur RTX 4090 avec `llama3.2`, comptez de l'ordre de **150 jetons/s**.
+Sur la machine d'essai (RTX 4070 Laptop, 8 Go), les valeurs mesurées vont de
+**36 à 64 jetons/s** selon le modèle et la fenêtre retenus ; le détail figure
+dans le [rapport de comparaison des modèles](rapport-benchmark-modeles.md).
 
-### 5.5 Aller plus loin : un modèle plus gros
+### 5.5 Changer de modèle
 
-Une RTX 4090 dispose de **24 Go de VRAM** : `llama3.2` (3 B, ~3 Go) est très
-petit pour cette carte. Pour améliorer nettement la qualité des réponses, on
-peut passer à un modèle plus gros sans quitter le GPU :
+Le modèle est un paramètre de déploiement : il se change sans toucher au code,
+par la variable `OLLAMA_MODEL`.
 
 ```bash
-docker exec ram-ollama ollama pull llama3.1:8b
+docker exec ram-ollama ollama pull <modele>
 ```
 
 puis, dans `.env` ou `docker-compose.yml` :
 
 ```yaml
-OLLAMA_MODEL: llama3.1:8b
+OLLAMA_MODEL: <modele>
 ```
 
-Ordres de grandeur sur 24 Go de VRAM (quantification `Q4_K_M`) :
+Ordres de grandeur sur 8 Go de VRAM (quantification `Q4_K_M`) :
 
 | Modèle | Taille | Tient en VRAM ? |
 | --- | --- | --- |
 | `llama3.2` (3 B) | ~3 Go | oui, très large |
-| `llama3.1:8b` | ~5 Go | oui |
-| `qwen2.5:14b` | ~9 Go | oui |
+| `llama3.1:8b` (retenu) | ~5 Go | oui, jusqu'à une fenêtre de 10 240 jetons |
+| `qwen2.5:14b` | ~9 Go | non sur 8 Go |
 | `llama3.1:70b` | ~40 Go | non (déborde sur le CPU) |
 
-> ⚠️ Un modèle plus gros que la VRAM disponible provoque un débordement vers le
-> CPU et fait **chuter** les performances en dessous du petit modèle. Restez
-> sous les 24 Go, en gardant de la marge pour le contexte.
+> ⚠️ Un modèle — ou une fenêtre — plus gros que la VRAM disponible provoque un
+débordement vers le CPU et fait **chuter** les performances. Surveillez la colonne
+`PROCESSOR` de `ollama ps` : dès qu'elle n'affiche plus `100% GPU`, une partie de
+l'inférence tourne sur le processeur.
+
+Le choix du modèle et de la fenêtre, argumenté sur des mesures, est documenté dans
+le [rapport de comparaison des modèles](rapport-benchmark-modeles.md).
 
 ## 6. Alternative : Ollama natif (sans Docker)
 
@@ -272,7 +287,7 @@ n'est accessible qu'en natif — il suffit d'installer Ollama sur l'hôte :
 ```bash
 brew install ollama          # macOS
 OLLAMA_HOST=0.0.0.0:11434 ollama serve     # terminal 1
-ollama pull llama3.2                        # terminal 2
+ollama pull llama3.1:8b                     # terminal 2
 ```
 
 Puis, dans `.env` :
@@ -294,7 +309,7 @@ cette variable.
 | `OLLAMA_MODEL` | `llama3.1:8b` | backend | Modèle utilisé |
 | `OLLAMA_KEEP_ALIVE` | `30m` | backend + ollama | Maintien du modèle en mémoire |
 | `OLLAMA_NUM_PREDICT` | `1024` | backend | Longueur maximale de la réponse ; détermine aussi la place laissée au prompt |
-| `OLLAMA_NUM_CTX` | `16384` | backend | Taille de la fenêtre de contexte, en jetons |
+| `OLLAMA_NUM_CTX` | `10240` | backend | Taille de la fenêtre de contexte, en jetons |
 | `OLLAMA_TIMEOUT` | `180` | backend | Délai maximal (secondes) |
 | `OLLAMA_NUM_PARALLEL` | `1` | ollama | Requêtes simultanées |
 | `OLLAMA_MAX_LOADED_MODELS` | `1` | ollama | Modèles gardés en mémoire |
@@ -324,7 +339,7 @@ curl -s http://localhost:11434/api/ps
 
 # 3. Latence brute du modèle
 curl -sS -w '\n--- %{time_total}s\n' http://localhost:11434/api/chat \
-  -d '{"model":"llama3.2","stream":false,"messages":[{"role":"user","content":"hi"}]}'
+  -d '{"model":"llama3.1:8b","stream":false,"messages":[{"role":"user","content":"hi"}]}'
 
 # 4. Latence de bout en bout (application complète)
 curl -sS -w '\n--- %{time_total}s\n' http://localhost:8000/api/chatbot \

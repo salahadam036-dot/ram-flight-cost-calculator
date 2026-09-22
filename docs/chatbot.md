@@ -43,8 +43,12 @@ précis.
 - Le nombre de vols détaillés est plafonné par un budget de caractères
   (`BUDGET_CARACTERES`). Au-delà, les vols les plus anciens ne sont plus listés —
   ils restent comptés dans les indicateurs.
-- `OLLAMA_NUM_CTX` (défaut `16384`) fixe la taille de la fenêtre de contexte du
-  modèle. L'augmenter consomme de la mémoire : le cache KV croît avec elle.
+- `OLLAMA_NUM_CTX` (défaut `10240`) fixe la taille de la fenêtre de contexte du
+  modèle. L'augmenter consomme de la mémoire : le cache KV croît avec elle. La
+  fenêtre doit couvrir le prompt **et** la réponse : l'instantané de l'application
+  pèse à lui seul environ 8 400 jetons, et une fenêtre plus petite que lui fait
+  tronquer silencieusement le contexte (Ollama journalise alors `truncating input
+  prompt`). Voir le [rapport de comparaison des modèles](rapport-benchmark-modeles.md).
 - `OLLAMA_NUM_PREDICT` (défaut `1024`) borne la réponse **et** détermine la place
   laissée au prompt : Ollama réserve dans la fenêtre autant de place que
   `num_predict`. Une valeur infinie (`-1`) lui ferait réserver la moitié de la
